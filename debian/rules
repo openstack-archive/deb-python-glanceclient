@@ -6,13 +6,23 @@
 %:
 	dh $@  --with python2
 
+DEBVERS := $(shell dpkg-parsechangelog | sed -n -e 's/^Version: //p')
+VERSION := $(shell echo '$(DEBVERS)' | sed -e 's/^[[:digit:]]*://' -e 's/[~-].*//')
+
+override_dh_auto_configure:
+	echo $(VERSION) > glanceclient/versioninfo
+	dh_auto_configure
+
 override_dh_auto_clean:
+	echo $(VERSION) > glanceclient/versioninfo
 	dh_auto_clean
-	rm -rf glanceclient/versioninfo
-	rm -rf ChangeLog
+	rm -f glanceclient/versioninfo
+	rm -f ChangeLog
 
 override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	set -e ; for pyversion in $(shell pyversions -r); do $$pyversion setup.py test; done
+endif
 
 get-orig-source:
 	uscan --verbose --force-download --rename --destdir=../build-area

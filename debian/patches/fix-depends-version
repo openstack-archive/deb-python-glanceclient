@@ -1,0 +1,11 @@
+Description: Fix depends version
+Author: Mehdi Abaakouk <sileht@sileht.net>
+
+--- python-glanceclient-0.5.1.orig/tools/pip-requires
++++ python-glanceclient-0.5.1/tools/pip-requires
+@@ -1,4 +1,4 @@
+ argparse
+ prettytable>=0.6,<0.7
+-python-keystoneclient>=0.1.2,<0.2
++python-keystoneclient>=2012.2,<2012.3
+ warlock<2
