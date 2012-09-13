@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+%:
+	dh $@  --with python2
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf glanceclient/versioninfo
+	rm -rf ChangeLog
+
+override_dh_auto_test:
+	set -e ; for pyversion in $(shell pyversions -r); do $$pyversion setup.py test; done
+
+get-orig-source:
+	uscan --verbose --force-download --rename --destdir=../build-area

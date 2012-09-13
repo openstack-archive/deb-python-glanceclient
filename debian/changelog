@@ -1,0 +1,72 @@
+python-glanceclient (1:0.5.1-1) experimental; urgency=low
+
+  * First debian release (Closes #687505)
+
+ -- Mehdi Abaakouk <sileht@sileht.net>  Thu, 13 Sep 2012 12:57:34 +0200
+
+python-glanceclient (1:0.5.0.1.7402590-0ubuntu1) quantal; urgency=low
+
+  [ Soren Hansen ]
+  * Update debian/watch to account for symbolically named tarballs and
+    use newer URL.
+  * Fix Launchpad URLs in debian/watch.
+
+  [ Chuck Short ]
+  * New upstream version.
+
+ -- Chuck Short <zulcss@ubuntu.com>  Fri, 07 Sep 2012 12:23:37 -0500
+
+python-glanceclient (1:0.4.1-0ubuntu2) quantal; urgency=low
+
+  * debian/patches/fix-ubuntu-tests.patch: Refreshed.
+
+ -- Adam Gandelman <adamg@canonical.com>  Wed, 22 Aug 2012 23:43:28 -0700
+
+python-glanceclient (1:0.4.1-0ubuntu1) quantal; urgency=low
+
+  [ Adam Gandelman ]
+  * debian/control, pydist-overrides: Add python-setuptools-git,
+    python-warlock.
+
+  [ Chuck Short ]
+  * New upstream version.
+  * debian/control: Add python-keystoneclient as a depends.
+
+ -- Chuck Short <zulcss@ubuntu.com>  Thu, 16 Aug 2012 12:24:18 -0500
+
+python-glanceclient (1:0.1.1-0ubuntu1) quantal; urgency=low
+
+  [ Chuck Short ]
+  * New upstream release.
+  * debian/rules: Fix test suite
+  * debian/patches/fix-ubuntu-tests: Re-introduced to prevent downloading
+    virtualenv deps.
+  * debian/watch: Update with new location.
+
+  [ Adam Gandleman ]
+  * debian/control: wrap-and-sort, add python-setuptools to Depends.
+  * debian/pydist-overrides: Override python-keystoneclient.
+
+ -- Chuck Short <zulcss@ubuntu.com>  Fri, 06 Jul 2012 11:31:31 -0400
+
+python-glanceclient (2012.2~f2~20120621.59-0ubuntu1) quantal; urgency=low
+
+  * New usptream version.
+  * debian/docs: Include changelog and readme.rst
+  * debian/watch: Fix url
+
+ -- Chuck Short <zulcss@ubuntu.com>  Fri, 22 Jun 2012 10:41:03 -0400
+
+python-glanceclient (2012.2~f1-0ubuntu2) quantal; urgency=low
+
+  * debian/control:
+    - Use Architecture: all (LP: #1013860)
+    - Update maintainer
+
+ -- Michael Terry <mterry@ubuntu.com>  Thu, 21 Jun 2012 07:15:43 -0400
+
+python-glanceclient (2012.2~f1-0ubuntu1) quantal; urgency=low
+
+  * Initial release.
+
+ -- Chuck Short <zulcss@ubuntu.com>  Tue, 29 May 2012 08:34:09 -0400

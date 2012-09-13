@@ -1,0 +1,28 @@
+Source: python-glanceclient
+Section: python
+Priority: extra
+Maintainer: PKG OpenStack <openstack-devel@lists.alioth.debian.org>
+Uploaders: Mehdi Abaakouk <sileht@sileht.net>
+Build-Depends: debhelper (>= 8.0.0),
+ pep8,
+ python-all (>= 2.6.6-3~),
+ python-httplib2,
+ python-keystoneclient,
+ python-mox,
+ python-nose,
+ python-prettytable,
+ python-setuptools,
+ python-setuptools-git,
+ python-sphinx,
+ python-warlock
+Standards-Version: 3.9.3
+Homepage: http://launchpad.net/glance
+
+Package: python-glanceclient
+Architecture: all
+Depends: ${misc:Depends}, ${python:Depends}
+Replaces: glance-common
+Description: Client library for Openstack glance server.
+ This is a client for the Glance which uses the OpenStack Image API. There's a
+ Python API (the ``glanceclient`` module), and a command-line script
+ (``glance``).

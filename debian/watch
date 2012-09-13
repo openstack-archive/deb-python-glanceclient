@@ -1,0 +1,3 @@
+version=3
+opts="uversionmangle=s/%7E/~/" https://launchpad.net/python-glanceclient/+download https://launchpad.net/python-glanceclient/.*/.*/.*/python-glanceclient-(.*)\.tar\.gz
+http://tarballs.openstack.org/python-glanceclient/ python-glanceclient-(\d.*).tar.gz
