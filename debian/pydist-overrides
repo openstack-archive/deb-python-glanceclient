@@ -2,3 +2,4 @@ argparse
 python-keystoneclient
 setuptools-git
 warlock
+distribute

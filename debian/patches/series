@@ -1,1 +1,2 @@
-fix-depends-version
+fix-depends-version.patch
+fix-ubuntu-tests.patch

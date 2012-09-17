@@ -7,21 +7,33 @@ Build-Depends: debhelper (>= 8.0.0),
  pep8,
  python-all (>= 2.6.6-3~),
  python-httplib2,
- python-argparse,
  python-keystoneclient,
+ python-argparse,
  python-mox,
  python-nose,
  python-prettytable,
  python-setuptools,
  python-setuptools-git,
  python-sphinx,
- python-warlock
+ python-distribute,
+ python-warlock,
+ python-nosexcover
+# python-nosehtmloutput
 Standards-Version: 3.9.3
+X-Python-Version: >= 2.6
 Homepage: http://launchpad.net/glance
 
 Package: python-glanceclient
 Architecture: all
-Depends: ${misc:Depends}, ${python:Depends}
+Depends: python-httplib2,
+ python-keystoneclient,
+ python-prettytable,
+ python-setuptools,
+ python-keystoneclient,
+ python-warlock,
+ ${misc:Depends},
+ ${python:Depends}
+Breaks: glance-common
 Replaces: glance-common
 Description: Client library for Openstack glance server.
  This is a client for the Glance which uses the OpenStack Image API. There's a
