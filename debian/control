@@ -33,8 +33,6 @@ Depends: python-httplib2,
  python-warlock,
  ${misc:Depends},
  ${python:Depends}
-Breaks: glance-common
-Replaces: glance-common
 Description: Client library for Openstack glance server.
  This is a client for the Glance which uses the OpenStack Image API. There's a
  Python API (the ``glanceclient`` module), and a command-line script
