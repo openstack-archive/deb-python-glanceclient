@@ -1,0 +1,32 @@
+--- a/MANIFEST.in
++++ b/MANIFEST.in
+@@ -3,3 +3,29 @@
+ include glanceclient/versioninfo
+ exclude .gitignore
+ exclude .gitreview
++include glanceclient/__init__.py
++include glanceclient/client.py
++include glanceclient/common/__init__.py
++include glanceclient/common/base.py
++include glanceclient/common/exceptions.py
++include glanceclient/common/http.py
++include glanceclient/common/utils.py
++include glanceclient/exc.py
++include glanceclient/openstack/__init__.py
++include glanceclient/openstack/common/__init__.py
++include glanceclient/openstack/common/importutils.py
++include glanceclient/openstack/common/setup.py
++include glanceclient/openstack/common/version.py
++include glanceclient/shell.py
++include glanceclient/v1/__init__.py
++include glanceclient/v1/client.py
++include glanceclient/v1/image_members.py
++include glanceclient/v1/images.py
++include glanceclient/v1/legacy_shell.py
++include glanceclient/v1/shell.py
++include glanceclient/v2/__init__.py
++include glanceclient/v2/client.py
++include glanceclient/v2/images.py
++include glanceclient/v2/schemas.py
++include glanceclient/v2/shell.py
++include glanceclient/version.py
