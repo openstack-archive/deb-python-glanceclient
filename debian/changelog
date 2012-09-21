@@ -1,6 +1,6 @@
 python-glanceclient (1:0.5.1-1) experimental; urgency=low
 
-  * First debian release (Closes #687505)
+  * First debian release (Closes: #687505)
 
  -- Mehdi Abaakouk <sileht@sileht.net>  Thu, 13 Sep 2012 12:57:34 +0200
 

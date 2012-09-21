@@ -18,7 +18,6 @@ Build-Depends: debhelper (>= 8.0.0),
  python-distribute,
  python-warlock,
  python-nosexcover
-# python-nosehtmloutput
 Standards-Version: 3.9.3
 X-Python-Version: >= 2.6
 Homepage: http://launchpad.net/glance
@@ -33,7 +32,7 @@ Depends: python-httplib2,
  python-warlock,
  ${misc:Depends},
  ${python:Depends}
-Description: Client library for Openstack glance server.
+Description: Client library for Openstack glance server
  This is a client for the Glance which uses the OpenStack Image API. There's a
  Python API (the ``glanceclient`` module), and a command-line script
  (``glance``).
