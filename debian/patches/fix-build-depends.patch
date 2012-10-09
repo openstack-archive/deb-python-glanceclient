@@ -1,0 +1,19 @@
+Index: python-glanceclient/tools/pip-requires
+===================================================================
+--- python-glanceclient.orig/tools/pip-requires
++++ python-glanceclient/tools/pip-requires
+@@ -1,4 +1,4 @@
+ argparse
+ prettytable>=0.6,<0.7
+-python-keystoneclient>=0.1.2,<0.2
++python-keystoneclient>=2012.1
+ warlock<2
+Index: python-glanceclient/tools/test-requires
+===================================================================
+--- python-glanceclient.orig/tools/test-requires
++++ python-glanceclient/tools/test-requires
+@@ -3,3 +3,4 @@
+ pep8==1.2
+ setuptools-git>=0.4
+ sphinx>=1.1.2
++distribute>0.6.23

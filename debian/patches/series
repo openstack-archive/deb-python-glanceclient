@@ -1,2 +1,3 @@
 fix-ubuntu-tests.patch
 install-missing-files.patch
+fix-build-depends.patch
