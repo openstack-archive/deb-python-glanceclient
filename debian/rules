@@ -24,6 +24,16 @@ ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	set -e ; for pyversion in $(shell pyversions -r); do $$pyversion setup.py test; done
 endif
 
+get-vcs-sources:
+	git remote add upstream git://github.com/openstack/python-glanceclient.git || true
+	git fetch upstream
+	git archive --prefix=python-glanceclient-$(VERSION)/ $(VERSION) | xz >../python-glanceclient_$(VERSION).orig.tar.xz
+	if ! git checkout master ; then \
+		echo "No upstream branch: checking out" ; \
+		git checkout -b master upstream/master ; \
+	fi
+	git checkout debian/experimental
+
 get-orig-source:
 	uscan --verbose --force-download --rename --destdir=../build-area
 
