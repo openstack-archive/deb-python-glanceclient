@@ -24,7 +24,7 @@ ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	set -e ; for pyversion in $(shell pyversions -r); do $$pyversion setup.py test; done
 endif
 
-get-vcs-sources:
+get-vcs-source:
 	git remote add upstream git://github.com/openstack/python-glanceclient.git || true
 	git fetch upstream
 	if [ ! -f ../python-glanceclient_$(VERSION).orig.tar.xz ] ; then \
