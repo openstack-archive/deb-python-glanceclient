@@ -1,6 +1,11 @@
 python-glanceclient (1:0.5.1-1) experimental; urgency=low
 
+  [ Mehdi Abaakouk ]
   * First debian release (Closes: #687505)
+
+  [ Thomas Goirand ]
+  * Added a Replaces: glance-common (<< 2012.2), since this package provides
+  the glance userland command line.
 
  -- Mehdi Abaakouk <sileht@sileht.net>  Thu, 13 Sep 2012 12:57:34 +0200
 
