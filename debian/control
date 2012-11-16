@@ -23,6 +23,8 @@ Build-Depends-Indep:
  python-warlock,
  python-nosexcover
 Standards-Version: 3.9.3
+Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-glanceclient.git;a=summary
+Vcs-Git: git://anonscm.debian.org/openstack/python-glanceclient.git
 Homepage: http://glance.openstack.org
 
 Package: python-glanceclient
