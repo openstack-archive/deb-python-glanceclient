@@ -29,6 +29,7 @@ Homepage: http://glance.openstack.org
 
 Package: python-glanceclient
 Architecture: all
+Pre-Depends: dpkg (>= 1.15.6~)
 Depends: python-httplib2,
  python-keystoneclient,
  python-prettytable,
