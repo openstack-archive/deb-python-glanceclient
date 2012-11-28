@@ -1,3 +1,7 @@
+Description: Fixes tools/test-requires
+Author: Mehdi Abaakouk <sileht@sileht.net>
+Forwarded: not-needed
+
 Index: python-glanceclient-0.5.0.1.3e6c0b6/tools/test-requires
 ===================================================================
 --- python-glanceclient-0.5.0.1.3e6c0b6.orig/tools/test-requires	2012-08-22 23:39:33.000000000 -0700
