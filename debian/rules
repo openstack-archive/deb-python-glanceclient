@@ -19,6 +19,10 @@ override_dh_auto_clean:
 	rm -f glanceclient/versioninfo
 	rm -f ChangeLog
 
+override_dh_install:
+	dh_install
+	rm -rf $(CURDIR)/debian/python-glanceclient/usr/glanceclient
+
 override_dh_auto_test:
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	set -e ; for pyversion in $(shell pyversions -r); do $$pyversion setup.py test; done
