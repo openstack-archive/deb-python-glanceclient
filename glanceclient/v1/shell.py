@@ -15,13 +15,24 @@
 
 import argparse
 import copy
+import os
 import sys
 
+if os.name == 'nt':
+    import msvcrt
+else:
+    msvcrt = None
+
+from glanceclient import exc
 from glanceclient.common import utils
 import glanceclient.v1.images
 
 #NOTE(bcwaldon): import deprecated cli functions
 from glanceclient.v1.legacy_shell import *
+
+CONTAINER_FORMATS = 'Acceptable formats: ami, ari, aki, bare, and ovf.'
+DISK_FORMATS = ('Acceptable formats: ami, ari, aki, vhd, vmdk, raw, '
+                'qcow2, vdi, and iso.')
 
 
 @utils.arg('--name', metavar='<NAME>',
@@ -29,9 +40,11 @@ from glanceclient.v1.legacy_shell import *
 @utils.arg('--status', metavar='<STATUS>',
            help='Filter images to those that have this status.')
 @utils.arg('--container-format', metavar='<CONTAINER_FORMAT>',
-           help='Filter images to those that have this container format.')
+           help='Filter images to those that have this container format. '
+                + CONTAINER_FORMATS)
 @utils.arg('--disk-format', metavar='<DISK_FORMAT>',
-           help='Filter images to those that have this disk format.')
+           help='Filter images to those that have this disk format. '
+                + DISK_FORMATS)
 @utils.arg('--size-min', metavar='<SIZE>',
            help='Filter images to those with a size greater than this.')
 @utils.arg('--size-max', metavar='<SIZE>',
@@ -41,6 +54,8 @@ from glanceclient.v1.legacy_shell import *
             action='append', dest='properties', default=[])
 @utils.arg('--page-size', metavar='<SIZE>', default=None, type=int,
            help='Number of images to request in each paginated request.')
+@utils.arg('--human-readable', action='store_true', default=False,
+           help='Print image size in a human-friendly format.')
 def do_image_list(gc, args):
     """List images you can access."""
     filter_keys = ['name', 'status', 'container_format', 'disk_format',
@@ -58,23 +73,56 @@ def do_image_list(gc, args):
     images = gc.images.list(**kwargs)
     columns = ['ID', 'Name', 'Disk Format', 'Container Format',
                'Size', 'Status']
+
+    if args.human_readable:
+        def convert_size(image):
+            image.size = utils.make_size_human_readable(image.size)
+            return image
+
+        images = (convert_size(image) for image in images)
+
     utils.print_list(images, columns)
 
 
-def _image_show(image):
+def _image_show(image, human_readable=False):
     # Flatten image properties dict for display
     info = copy.deepcopy(image._info)
+    if human_readable:
+        info['size'] = utils.make_size_human_readable(info['size'])
     for (k, v) in info.pop('properties').iteritems():
         info['Property \'%s\'' % k] = v
 
     utils.print_dict(info)
 
 
+def _set_data_field(fields, args):
+    if 'location' not in fields and 'copy_from' not in fields:
+        if args.file:
+            fields['data'] = open(args.file, 'rb')
+        else:
+            # We distinguish between cases where image data is pipelined:
+            # (1) glance ... < /tmp/file or cat /tmp/file | glance ...
+            # and cases where no image data is provided:
+            # (2) glance ...
+            if (sys.stdin.isatty() is not True):
+                # Our input is from stdin, and we are part of
+                # a pipeline, so data may be present. (We are of
+                # type (1) above.)
+                if msvcrt:
+                    msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
+                fields['data'] = sys.stdin
+            else:
+                # We are of type (2) above, no image data supplied
+                fields['data'] = None
+
+
 @utils.arg('id', metavar='<IMAGE_ID>', help='ID of image to describe.')
+@utils.arg('--human-readable', action='store_true', default=False,
+           help='Print image size in a human-friendly format.')
 def do_image_show(gc, args):
     """Describe a specific image."""
     image = gc.images.get(args.id)
-    _image_show(image)
+    _image_show(image, args.human_readable)
 
 
 @utils.arg('--file', metavar='<FILE>',
@@ -92,10 +140,10 @@ def do_image_download(gc, args):
            help='ID of image to reserve.')
 @utils.arg('--name', metavar='<NAME>',
            help='Name of image.')
-@utils.arg('--disk-format', metavar='<CONTAINER_FORMAT>',
-           help='Disk format of image.')
-@utils.arg('--container-format', metavar='<DISK_FORMAT>',
-           help='Container format of image.')
+@utils.arg('--disk-format', metavar='<DISK_FORMAT>',
+           help='Disk format of image. ' + DISK_FORMATS)
+@utils.arg('--container-format', metavar='<CONTAINER_FORMAT>',
+           help='Container format of image. ' + CONTAINER_FORMATS)
 @utils.arg('--owner', metavar='<TENANT_ID>',
            help='Tenant who should own image.')
 @utils.arg('--size', metavar='<SIZE>',
@@ -115,7 +163,8 @@ def do_image_download(gc, args):
                  ' creation. Alternatively, images can be passed to the client'
                  ' via stdin.'))
 @utils.arg('--checksum', metavar='<CHECKSUM>',
-           help='Hash of image data used Glance can use for verification.')
+           help=('Hash of image data used Glance can use for verification.'
+                 ' Provide a md5 checksum here.'))
 @utils.arg('--copy-from', metavar='<IMAGE_URL>',
            help=('Similar to \'--location\' in usage, but this indicates that'
                  ' the Glance server should immediately copy the data and'
@@ -124,13 +173,15 @@ def do_image_download(gc, args):
 # to use --is-public
 @utils.arg('--public', action='store_true', default=False,
            help=argparse.SUPPRESS)
-@utils.arg('--is-public', type=utils.string_to_bool,
+@utils.arg('--is-public', type=utils.string_to_bool, metavar='[True|False]',
            help='Make image accessible to the public.')
-@utils.arg('--is-protected', type=utils.string_to_bool,
+@utils.arg('--is-protected', type=utils.string_to_bool, metavar='[True|False]',
            help='Prevent image from being deleted.')
 @utils.arg('--property', metavar="<key=value>", action='append', default=[],
            help=("Arbitrary property to associate with image. "
                  "May be used multiple times."))
+@utils.arg('--human-readable', action='store_true', default=False,
+           help='Print image size in a human-friendly format.')
 def do_image_create(gc, args):
     """Create a new image."""
     # Filter out None values
@@ -151,23 +202,19 @@ def do_image_create(gc, args):
     CREATE_PARAMS = glanceclient.v1.images.CREATE_PARAMS
     fields = dict(filter(lambda x: x[0] in CREATE_PARAMS, fields.items()))
 
-    if 'location' not in fields and 'copy_from' not in fields:
-        if args.file:
-            fields['data'] = open(args.file, 'r')
-        else:
-            fields['data'] = sys.stdin
+    _set_data_field(fields, args)
 
     image = gc.images.create(**fields)
-    _image_show(image)
+    _image_show(image, args.human_readable)
 
 
 @utils.arg('id', metavar='<IMAGE_ID>', help='ID of image to modify.')
 @utils.arg('--name', metavar='<NAME>',
            help='Name of image.')
 @utils.arg('--disk-format', metavar='<CONTAINER_FORMAT>',
-           help='Disk format of image.')
+           help='Disk format of image. ' + CONTAINER_FORMATS)
 @utils.arg('--container-format', metavar='<DISK_FORMAT>',
-           help='Container format of image.')
+           help='Container format of image. ' + DISK_FORMATS)
 @utils.arg('--owner', metavar='<TENANT_ID>',
            help='Tenant who should own image.')
 @utils.arg('--size', metavar='<SIZE>',
@@ -191,9 +238,9 @@ def do_image_create(gc, args):
            help=('Similar to \'--location\' in usage, but this indicates that'
                  ' the Glance server should immediately copy the data and'
                  ' store it in its configured image store.'))
-@utils.arg('--is-public', type=utils.string_to_bool,
+@utils.arg('--is-public', type=utils.string_to_bool, metavar='[True|False]',
            help='Make image accessible to the public.')
-@utils.arg('--is-protected', type=utils.string_to_bool,
+@utils.arg('--is-protected', type=utils.string_to_bool, metavar='[True|False]',
            help='Prevent image from being deleted.')
 @utils.arg('--property', metavar="<key=value>", action='append', default=[],
            help=("Arbitrary property to associate with image. "
@@ -202,6 +249,8 @@ def do_image_create(gc, args):
            help=("If this flag is present, delete all image properties "
                  "not explicitly set in the update request. Otherwise, "
                  "those properties not referenced are preserved."))
+@utils.arg('--human-readable', action='store_true', default=False,
+           help='Print image size in a human-friendly format.')
 def do_image_update(gc, args):
     """Update a specific image."""
     # Filter out None values
@@ -222,20 +271,30 @@ def do_image_update(gc, args):
     UPDATE_PARAMS = glanceclient.v1.images.UPDATE_PARAMS
     fields = dict(filter(lambda x: x[0] in UPDATE_PARAMS, fields.items()))
 
-    if 'location' not in fields and 'copy_from' not in fields:
-        if args.file:
-            fields['data'] = open(args.file, 'r')
-        else:
-            fields['data'] = sys.stdin
+    _set_data_field(fields, args)
 
     image = gc.images.update(image_id, purge_props=args.purge_props, **fields)
-    _image_show(image)
+    _image_show(image, args.human_readable)
 
 
-@utils.arg('id', metavar='<IMAGE_ID>', help='ID of image to delete.')
+@utils.arg('id', metavar='<IMAGE_ID>', nargs='+',
+           help='ID of image(s) to delete.')
 def do_image_delete(gc, args):
-    """Delete a specific image."""
-    gc.images.delete(args.id)
+    """Delete specified image(s)."""
+    for image in args.id:
+        try:
+            if args.verbose:
+                print 'Requesting image delete for %s ...' % image,
+
+            gc.images.delete(image)
+
+            if args.verbose:
+                print '[Done]'
+
+        except exc.HTTPException, e:
+            if args.verbose:
+                print '[Fail]'
+            print '%s: Unable to delete image %s' % (e, image)
 
 
 @utils.arg('--image-id', metavar='<IMAGE_ID>',
@@ -272,14 +331,14 @@ def do_member_create(gc, args):
 
 
 @utils.arg('image_id', metavar='<IMAGE_ID>',
-           help='Image to add member to.')
+           help='Image from which to remove member')
 @utils.arg('tenant_id', metavar='<TENANT_ID>',
-           help='Tenant to add as member')
+           help='Tenant to remove as member')
 def do_member_delete(gc, args):
     """Remove a shared image from a tenant."""
-    if not options.dry_run:
+    if not args.dry_run:
         gc.image_members.delete(args.image_id, args.tenant_id)
     else:
         print "Dry run. We would have done the following:"
-        print ('Remove "%(member_id)s" from the member list of image '
-               '"%(image_id)s"' % locals())
+        print ('Remove "%s" from the member list of image '
+               '"%s"' % (args.tenant_id, args.image_id))

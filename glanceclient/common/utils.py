@@ -168,3 +168,18 @@ def integrity_iter(iter, checksum):
         raise IOError(errno.EPIPE,
                       'Corrupt image download. Checksum was %s expected %s' %
                       (md5sum, checksum))
+
+
+def make_size_human_readable(size):
+    suffix = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB']
+    base = 1024.0
+
+    index = 0
+    while size >= base:
+        index = index + 1
+        size = size / base
+
+    padded = '%.1f' % size
+    stripped = padded.rstrip('0').rstrip('.')
+
+    return '%s%s' % (stripped, suffix[index])
