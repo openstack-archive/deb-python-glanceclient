@@ -34,7 +34,6 @@ Depends: python-httplib2,
  python-keystoneclient,
  python-prettytable,
  python-setuptools,
- python-keystoneclient,
  python-warlock,
  ${misc:Depends},
  ${python:Depends}
