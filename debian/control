@@ -38,6 +38,7 @@ Depends: python-httplib2,
  ${misc:Depends},
  ${python:Depends}
 Replaces: glance-common (<< 2012.2)
+Breaks: glance-common (<< 2012.2)
 Description: Client library for Openstack glance server
  The Glance project provides services for discovering, registering, and
  retrieving virtual machine images over the cloud. They may be stand-alone
