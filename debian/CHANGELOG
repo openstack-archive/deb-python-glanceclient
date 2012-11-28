@@ -1,0 +1,2091 @@
+commit ae16750c48bc8d4b2b8d4de87913572a276f4f1e
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Nov 19 14:56:38 2012 -0800
+
+    Document bugs/features for v0.6.0
+    
+    Change-Id: I8966d74eb86e52a222ddac5bc6d52d1dd699fb3d
+
+commit 046d34c89185c31b79f580dd2cafa9f790920426
+Merge: e40580b fe17d35
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Mon Nov 19 19:39:19 2012 +0000
+
+    Merge "Simplify human-readable size output"
+
+commit e40580b77a513cdfb89da15852ea73de0d9a6eea
+Merge: 882c13a b24832c
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Mon Nov 19 18:56:52 2012 +0000
+
+    Merge "Make image sizes more readable for humans"
+
+commit 882c13ab8cb4bd57a61ae3918f4c3ab1e3185a5d
+Merge: 0192e14 0e90f8e
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Mon Nov 19 18:52:55 2012 +0000
+
+    Merge "Set useful boolean flag metavars"
+
+commit 0192e14d5652500185aa9410fe6e39cd25c1ec6b
+Merge: 1899ac2 e20ff23
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Mon Nov 19 18:48:11 2012 +0000
+
+    Merge "added --version as new parameter"
+
+commit fe17d3517482525527d4af9b24df64e7651ebe3a
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Nov 19 10:35:04 2012 -0800
+
+    Simplify human-readable size output
+    
+    * Limit human-readable sizes to a single decimal
+    * Drop trailing zero
+    * Step one suffix further in the case of a size being 1024
+    
+    Change-Id: I2eb8ac0571d3d08b52f62155912863870573a37c
+
+commit b24832c22aa44d2f8b5ecddaf12e7878653af28f
+Author: Christian Berendt <berendt@b1-systems.de>
+Date:   Wed Nov 7 19:39:43 2012 +0100
+
+    Make image sizes more readable for humans
+    
+    By introducing the parameter --human-readable for several functions
+    (image-list, image-show, image-update, image-create) it's possible
+    to convert the size in bytes to something more readable like
+    9.309MB or 1.375GB.
+    
+    Change-Id: I4e2654994361dcf330ed6d681dbed73388f159cb
+
+commit 0e90f8ef230eebd421175d637d7c9df7d149a155
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Nov 19 09:08:39 2012 -0800
+
+    Set useful boolean flag metavars
+    
+    The boolean flags --is-protected and --is-public now
+    communicate that they must be set to True or False.
+    
+    Fixes bug 1056501.
+    
+    Change-Id: I23094ea556eb71d6eb977a64c171119738ed792b
+
+commit 1899ac29637923ad8ff18f863a9d7081a34593d0
+Merge: c6b9712 8d81623
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Sat Nov 17 00:57:15 2012 +0000
+
+    Merge "Unpin keystoneclient dependency"
+
+commit 8d81623d5f1891a19f58d66cc28f7d4033293354
+Author: Vishvananda Ishaya <vishvananda@gmail.com>
+Date:   Fri Nov 16 16:29:43 2012 -0800
+
+    Unpin keystoneclient dependency
+    
+    The new 0.2.0 keystoneclient was released with no api changes, and
+    glanceclients dependency breaks gating so unpin it.
+    
+    Change-Id: I9cbe2ebb462005ebfea3b7a0e68ca39069a0765f
+
+commit c6b9712482389a36102141aecb36a0199291092b
+Merge: 00eff28 6c201e6
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Thu Nov 15 21:18:44 2012 +0000
+
+    Merge "Fixes bug on Windows related to a wrong API url"
+
+commit 6c201e63ea76032cbdd65211382b6266e6a767de
+Author: Alessandro Pilotti <ap@pilotti.it>
+Date:   Thu Nov 15 20:25:26 2012 +0200
+
+    Fixes bug on Windows related to a wrong API url
+    
+    Fixes Bug #1079323
+    
+    python-glanceclient (latest repository code) fails on Windows due to a
+    malformed API url. This error is due to the usage of os.path.normpath(),
+    which should not be used for URLs as it swaps "/" with "\" on Windows.
+    
+    The fix consists in using posixpath.normpath().
+    Please see also https://bugs.launchpad.net/nova/+bug/1077125 and related
+    commit.
+    
+    Change-Id: Iaa643bd579963ad9ffbf10674973cbca75d435ac
+
+commit 00eff28f28f57fa3f786629dbf20c19b558188ef
+Author: Andre Naehring <naehring@b1-systems.de>
+Date:   Wed Nov 14 15:37:31 2012 +0100
+
+    Enhance --checksum help with algorithm
+    
+    Fixes bug 1056499.
+    
+    Added a line to the help text of --checksum which enhances the help text
+    to show what checksum algorithm is expected.
+    
+    Change-Id: Ie6604022dd9f398c639afe647b2d94b5179dbb61
+
+commit e20ff231587e9d3985602cf8df755e3f24459cda
+Author: Christian Berendt <berendt@b1-systems.de>
+Date:   Tue Nov 13 11:59:17 2012 +0100
+
+    added --version as new parameter
+    
+    fixes bug 1056504
+    Change-Id: Ib28e3941006b46553001d7895d5ddf4b0f9c540d
+
+commit 16aafa728e4b8309b16bcc120b10bc20372883f4
+Author: Alessandro Pilotti <ap@pilotti.it>
+Date:   Mon Nov 5 18:19:13 2012 +0200
+
+    Fixes setup compatibility issue on Windows
+    
+    Fixes Bug #1052161
+    
+    "python setup.py build" fails on Windows due to a hardcoded shell path:
+    /bin/sh
+    
+    setup.py updated using openstack-common/update.py
+    
+    Change-Id: If0ae835aeada8769e46dddf4f3c2f2edfdfbc5fe
+
+commit a8e88aa340c2d1ad9d937e0f5c2c60c65d7e5962
+Merge: 256dcba 8b2c227
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Thu Oct 25 02:23:49 2012 +0000
+
+    Merge "Allow deletion of multiple images through CLI"
+
+commit 8b2c227f27be649a4a3e371ad99157ee464ecc1d
+Author: Sulochan Acharya <sulochan@gmail.com>
+Date:   Mon Oct 22 17:01:46 2012 -0500
+
+    Allow deletion of multiple images through CLI
+    
+    Add nargs to argparse for image-delete command to
+    allow muliple (optional) positional image-id arguments.
+    For example:
+    image-delete xxx aaa yyy will delete valid images
+    xxx and yyy and print error message for invalid image
+    aaa. Also with --verbose you can see some extra text
+    on delete request for each image.
+    
+    Fixes bug1056498.
+    
+    Change-Id: I6e804700ed24d16f90ec92569c0893cad4aaa26f
+
+commit 256dcbae1c8565284cb54f5c5693b9cfd7103425
+Merge: c420fa1 1e14e82
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Wed Oct 24 02:53:46 2012 +0000
+
+    Merge "Fixes shell command for member-delete"
+
+commit 1e14e82c815b06dfd8a370f1f97c61a256b28a9a
+Author: Sulochan Acharya <sulochan@gmail.com>
+Date:   Mon Oct 22 15:46:55 2012 -0500
+
+    Fixes shell command for member-delete
+    
+    Fixes the member-delete cli command and string formatting for
+    dry-run option.
+    Fixes bug1064320
+    
+    Change-Id: I338f03d53da5c9b7656ae4d1335de9623b774dd8
+
+commit c420fa10fe25fd671b2ca48dd86d80b499856ac6
+Author: Doug Hellmann <doug.hellmann@dreamhost.com>
+Date:   Mon Oct 22 18:43:53 2012 -0400
+
+    Add OpenStack trove classifier for PyPI
+    
+    Add trove classifier to have the client listed among the
+    other OpenStack-related projets on PyPI.
+    
+    Change-Id: I2bb290f529fd2cd08d0093f495074d8e1683d91f
+    Signed-off-by: Doug Hellmann <doug.hellmann@dreamhost.com>
+
+commit 9004ee40df67705d6e0f07df65763e7ae2c44b13
+Merge: 3576336 b5d46e2
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Sat Oct 13 02:54:09 2012 +0000
+
+    Merge "Display acceptable disk/container formats in help text"
+
+commit 3576336cb993d88b32638ed1f2bcab5dc31653fe
+Merge: 556082c 727aadb
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Sat Oct 13 02:17:31 2012 +0000
+
+    Merge "Handle create/update of images with unknown size"
+
+commit 556082cd6632dbce52ccb67ace57410d61057d66
+Author: Stuart McLaren <stuart.mclaren@hp.com>
+Date:   Fri Sep 21 14:18:22 2012 +0000
+
+    Implement blueprint ssl-connect-rework
+    
+    Use pyOpenSSL for HTTPS connections.
+    
+    This allows:
+    
+    * Neater loading of system CA files
+    * Optional disabling of SSL compression
+    
+    The performance gain from disabling SSL compression is significant
+    in cases where the image being uploaded/downloaded is in an already
+    compressed format (eg qcow2).
+    
+    Related to bp ssl-connect-rework.
+    
+    Change-Id: I0568b6c95c5fc7b8eafdbd0284e24c453660a55a
+
+commit 727aadbc257ec3c99dd1621202948d288d45c8cc
+Author: Stuart McLaren <stuart.mclaren@hp.com>
+Date:   Wed Sep 26 12:56:51 2012 +0000
+
+    Handle create/update of images with unknown size
+    
+    It may not be possible to know in advance the total
+    size of image data which is to be uploaded, for example
+    if the data is being piped to stdin.
+    
+    To handle this we use HTTP Transfer-Encoding: chunked
+    and do not set any image size headers.
+    
+    Various subtly different cases needed to be handled for
+    both image-create and image-update, including:
+    
+     * input from named pipe
+     * piped input of zero size
+     * regular file of zero length
+    
+    Fix for bug 1056220.
+    
+    Change-Id: I0c7f0a64d883e058993b954a1c465c5b057f2bcf
+
+commit b5d46e2e0d1e5df7f953787987b88880eb844b9d
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Oct 3 13:52:55 2012 -0700
+
+    Display acceptable disk/container formats in help text
+    
+    Fixes bug #1056497
+    
+    This patch provides more information in the help text. Originally the text
+    provided the trivial definitions of the arguments disk_format and
+    container_format. This patch updates the text to display the acceptable
+    formats.
+    
+    Change-Id: I893b52c9f72a34c75e8bea522820863592300302
+
+commit cdc06d9fdb15cd19bd5d26304dfebf092c6c8df8
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Oct 3 13:52:55 2012 -0700
+
+    Simplify http(s) connection instantiation
+    
+    The endpoint parsing and connection instantiation code was too
+    complicated and easily broken. This assigns human-readable names to
+    instance variables and breaks up the parsing into more understandable
+    chunks.
+    
+    Fixes bug 1060316.
+    
+    Change-Id: I5c5236f90d88b9e797cf0a476aabe8cc7cfa1cc9
+
+commit 11e6aadf190122d6a4776fc00e660b71a89dffb3
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Sep 11 16:22:56 2012 -0700
+
+    Add happy path tests for ResponseBodyIterator
+    
+    Change-Id: I5e971b57a0591752e7fca76d0df78ce139308db5
+
+commit ff3060c067bb2a860642a1c2e01ef151df8c5243
+Author: Diego Parrilla <diego.parrilla@stackops.com>
+Date:   Fri Sep 21 00:51:20 2012 +0200
+
+    Use full URI path from Glance endpoint in HTTP requests
+    
+    Fixes bug 1052846
+    
+    Now the connection uses host, port and path to connect to Glance. So proxied connections to Glance are allowed.
+    
+    Change-Id: I53a890e6532adb8168961d1d09f938bf439e895c
+
+commit e140dbb0c779de74e4ae063971660ac2d234365a
+Merge: cdc94af 91896ff
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Tue Sep 18 20:44:58 2012 +0000
+
+    Merge "Fixes glance add / update / image-create / image-update on Windows"
+
+commit cdc94af297fe56341dfe0484d62f2e69d9aa5e9b
+Author: Stuart McLaren <stuart.mclaren@hp.com>
+Date:   Mon Sep 17 13:39:33 2012 +0000
+
+    Typo in image-create help page
+    
+    The image-create help page reversed the DISK_FORMAT
+    and CONTAINER_FORMAT metavars.
+    
+    Fixes bug 1051968.
+    
+    Change-Id: I385cb0912ad87a62fd10742b5da23a5ea8bc9bb8
+
+commit 91896ff51861e8d90bdf0f7c54cab0f2b3e3c277
+Author: Alessandro Pilotti <ap@pilotti.it>
+Date:   Thu Sep 13 14:02:20 2012 +0300
+
+    Fixes glance add / update / image-create / image-update on Windows
+    
+    Fixes Bug #1050345
+    
+    The image upload hangs if the file contains a byte with value 0x1A (EOF), due to
+    the fact that the file or stdin streams are treated as text and not
+    binary streams. This fix sets the proper binary mode.
+    
+    Change-Id: I3425cb9729a8da4d1b73fbfba06fd6f2c7e8833e
+
+commit 902bff79bbe52e831da947bb5ac5fce2330d810e
+Author: Vincent Untz <vuntz@suse.com>
+Date:   Thu Sep 13 11:12:00 2012 +0200
+
+    Fix weird "None" displayed on some errors
+    
+    logging.exception() should only be called from an exception handler,
+    which is not the case here.
+    
+    Part of bug 1050260.
+    
+    Change-Id: I591a68c458cd733c04cea7d2d640afdbb7dd19f6
+
+commit 8cee48b1ddf480d182bbc33ec684dcfd195b038c
+Author: Andrew Laski <andrew.laski@rackspace.com>
+Date:   Wed Sep 12 09:40:04 2012 -0400
+
+    Make ConnectionRefused error more informative.
+    
+    When the server refuses the connection the error message displayed now
+    lists the endpoint that refused the connection.
+    
+    Fixes: bug 1043067
+    Change-Id: I62797106732bbb6eec8c99e491fd38850ad58ff8
+
+commit 3f67c461da236bf603cf4812f81f51200573f51f
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Sep 10 18:25:20 2012 -0700
+
+    Document remaining bug for v0.5.1
+    
+    Change-Id: I97144b22e2040441e6507ff1810ab7a3da9b1ae2
+
+commit 522317784a294923cb1d94cca744cd9cac242088
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Sep 10 16:53:32 2012 -0700
+
+    Update docs for v0.5.1 release
+    
+    Change-Id: I377caf14379ebffe3bbc70c67e9378fc0ebcea95
+
+commit 92d87c0f7cb0fdd5e5c8798fa52d81e81758e64c
+Merge: ff972fb 30d8e1b
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Mon Sep 10 23:38:06 2012 +0000
+
+    Merge "Specified Content-Length in update request header"
+
+commit ff972fb02f1992e8036606a03fa0e331c4804f75
+Merge: 2f1e029 5acd5a6
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Mon Sep 10 23:36:21 2012 +0000
+
+    Merge "Catches HTTP 300 while printing responses"
+
+commit 2f1e0299e84b7e3acfdb0c927025a84ae4c0704c
+Author: Brian Rosmaita <brian.rosmaita@rackspace.com>
+Date:   Mon Sep 10 19:19:20 2012 +0000
+
+    Corrects URI to display hostname, port properly
+    
+    Fixes bug 1035931
+    
+    Change-Id: I1b4e8a226c21d137b24bc5b75299bcf4ab4efefb
+
+commit 5acd5a6a4adc430989ae05c434d0ac5a9a448b84
+Author: isethi <iccha.sethi@rackspace.com>
+Date:   Fri Sep 7 20:54:09 2012 +0000
+
+    Catches HTTP 300 while printing responses
+    
+    If glance v1 api is not enabled, and a request is made to it,
+    it gives a KeyError. This patch catches the 300 error and
+    displays error message.
+    
+    Fixes bug 1046607
+    
+    Change-Id: I0009a5deca3b5dd5ccaeaea90feee21274bfe090
+
+commit 61b359efa836b5e25d85892e2772fd9856062103
+Author: Stuart McLaren <stuart.mclaren@hp.com>
+Date:   Mon Sep 10 14:57:45 2012 +0000
+
+    get_connection should raise httplib.InvalidURL
+    
+    In http.py the exception raised in get_connection
+    should be httplib.InvalidURL rather than httplib.InvalidUrl.
+    
+    Fix for bug 1048698.
+    
+    Change-Id: I7f18321fe7d8669b3b95bf823273ee8ae6961661
+
+commit def324ec5284d6cb8f33620961879e25fa7382d5
+Merge: 7402590 61567ba
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Mon Sep 10 15:20:46 2012 +0000
+
+    Merge "Fix PEP8 issues."
+
+commit 61567bad1ef4d78e8c362b571576e066a7138087
+Author: lrqrun <lrqrun@gmail.com>
+Date:   Wed Aug 29 19:06:36 2012 +0800
+
+    Fix PEP8 issues.
+    
+    Fix some pep8 issues in doc/source/conf.py  make the code looks pretty.
+    
+    Change-Id: I44f8152de76ae217d1dd81c9c0c1b1e075ec8792
+
+commit 30d8e1b97ce0621a0ce9aae97ad8ab35101860e6
+Author: Unmesh Gurjar <unmesh.gurjar@vertex.co.in>
+Date:   Thu Sep 6 00:36:38 2012 -0700
+
+    Specified Content-Length in update request header
+    
+    While uploading a Volume to an image, the HTTPConnection's request method does
+    not set the Content-Length header (since the volume file is a sym link i.e. the
+    os.fstat call returns a st_size of 0). This causes Volume uploads to Glance
+    fail (since the image data is ignored as no content-length is specified).
+    Therefore setting the Content-Length from update( ) method if the image data is
+    provided.
+    
+    Fixes LP: #1045824
+    
+    Change-Id: If259fc5a338e3e90214a52b773132ed901691c0f
+
+commit 740259025528836c4bc7a1d3bc840cdebf70192a
+Author: Mark McLoughlin <markmc@redhat.com>
+Date:   Wed Sep 5 12:55:55 2012 +0100
+
+    Sync importutils changes from openstack-common
+    
+    Syncs the following changes from stable/folsom:
+    
+     769ec65 Don't trap then re-raise ImportError.
+     8c74b37 Improve exception from importutils.import_class().
+     1fb2361 add import_object_ns function
+    
+    Change-Id: Ib6046181ec4712702c30c8a8e938fc9a21b1a594
+
+commit e233f66ecd0f30523226246bec1c2e62223344ec
+Merge: 1e8cf71 df7b82d
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Wed Aug 22 00:52:33 2012 +0000
+
+    Merge "Add nosehtmloutput as a test dependency."
+
+commit 1e8cf7102f292e7d2224faf50fc078990acb2fda
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Aug 21 16:44:22 2012 -0700
+
+    Update release notes for v0.5.0
+    
+    Change-Id: Icc8e1d9a4a06448b27afe6e4bb0976eee20dcc83
+
+commit 01ec6d942dc56d25b32ccbb370029bde5370f3ff
+Merge: 575c591 5069d66
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Tue Aug 21 23:07:57 2012 +0000
+
+    Merge "Update command descriptions"
+
+commit 575c591e4b684db4068330c5f7bd0aa2701f378c
+Merge: 156e6f9 27350e5
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Tue Aug 21 23:07:23 2012 +0000
+
+    Merge "Update pip-requires with warlock<2."
+
+commit 156e6f949d6b2663b19ddbb8c32e838b6755ddea
+Merge: 8a64e0f c24fc93
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Tue Aug 21 23:06:30 2012 +0000
+
+    Merge "Enable client V1 to download images"
+
+commit df7b82d2f22a4c3f801cdefeb5c92764e4809694
+Author: Clark Boylan <clark.boylan@gmail.com>
+Date:   Tue Aug 21 14:34:22 2012 -0700
+
+    Add nosehtmloutput as a test dependency.
+    
+    Adding nosehtmloutput as a test dependency allows nose to output its
+    results to an html file. This will be used by Jenkins to save logs on
+    a different server.
+    
+    Change-Id: Ib7f07dbe7e81d17d42a191a664c7f844f58fcb94
+
+commit 5069d66d518c407fdf9e7fdcc011bc69608148d0
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Aug 21 13:07:08 2012 -0700
+
+    Update command descriptions
+    
+    Several commands did not have descriptions or the descriptions
+    they had were insufficient. This adds mission descriptions
+    and fattens up those that were too lean.
+    
+    Change-Id: I091ae70cdae5d3f72f273519d88873cb5392ba3b
+
+commit 27350e50e0255591447b65aa94570479d3d3cb71
+Author: Dan Prince <dprince@redhat.com>
+Date:   Fri Aug 17 11:50:33 2012 -0400
+
+    Update pip-requires with warlock<2.
+    
+    Allow warlock to be used up to version 2 (the next
+    major version of the library).
+    
+    Change-Id: I0c5a47f9ebfa0145dfab7310a22982d5d8e9aa52
+
+commit c24fc93142263e34e50ea81a5fdb406b074c2831
+Author: Lars Gellrich <lars.gellrich@hp.com>
+Date:   Mon Aug 13 09:21:58 2012 +0000
+
+    Enable client V1 to download images
+    
+    Added the CLI option image-download to download an image via API V1.
+    Based on commit 137b3cf975d73437943e100065c76b83acfa7dd3
+    
+    Related to bp glance-client-v2
+    
+    Change-Id: Ie587e208ad7433e468798cd9b1846b4a21e1c4ec
+
+commit 8a64e0ff0e0f85a6cbfd8a03b7d04a12f4c53ab1
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Aug 15 18:06:35 2012 -0400
+
+    Simplify docs and provide 'News' on index.rst
+    
+    * The index page is now a set of release notes and a quickstart guide
+    * Shrink the README (pypi doc page) and move it into the doc site
+    * Drop the link to the autoindex module docs
+    
+    Change-Id: I276b1228ba4006279c112eb487dcde9e45c4f344
+
+commit d64876424e87b3a7f76a9bf4d29fdacbc5ad4bc4
+Author: Brian Lamar <brian.lamar@rackspace.com>
+Date:   Wed Aug 15 14:39:39 2012 -0400
+
+    Ensure v1 'limit' query parameter works correctly.
+    
+    The tests were present but were not asserting list results.
+    
+    page_size was overriding the absolute limit so limits were
+    not working if they were less than the page_size.
+    
+    Fixes bug 1037233
+    
+    Change-Id: If102824212e3846bc65d3f7928cf7aa2e48aaa63
+
+commit a5b8165d7de5edd15a616e2ff97c1f8b72b53e8c
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Aug 13 10:56:27 2012 -0700
+
+    Allow 'deleted' to be passed through image update
+    
+    The legacy client allowed users to pass 'deleted' through an
+    update call. This is breaking some clients of this library because
+    they expect to be be able to still do that.
+    
+    Fixes bug 1036315
+    
+    Change-Id: I9ae20a5e4579240c7d5e86316d6d1e927755dbf5
+
+commit 8f0d5c4f2cea6e5dae827b5f728c54dab4a4386b
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Aug 13 10:30:43 2012 -0700
+
+    Cast is_public, protected, deleted to bool
+    
+    To keep a consistent view of an image, is_public, protected, and
+    deleted need to be cast to a bool when being parsed from headers.
+    
+    Fix bug 1036299
+    
+    Change-Id: I2730a0f2d705d26ebc0ba883e99c1caf44d70b51
+
+commit 1e539dfdbecfdcf33d57ef79b9f845b90f547506
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Aug 13 10:18:51 2012 -0700
+
+    Return known int values as int, not str
+    
+    Cast size, min_ram, min_disk to integers before returning them
+    to the user from the v1 API.
+    
+    Fixes bug 1036297
+    
+    Change-Id: Ib1e2a3bf931e433b6311cc8a1a5219168b50be97
+
+commit 37caf870ac0c4afb80176b2357f5562a21725ccb
+Author: Stuart McLaren <stuart.mclaren@hp.com>
+Date:   Fri Aug 10 18:32:07 2012 +0000
+
+    Use system CA certificate file
+    
+    When SSL is being used and the --ca-file option is
+    not specified use an available system CA file to
+    verify the server's certificate.
+    
+    Change-Id: Id5c9fda6fd9bd05cde3c2a9160a6e72cef086a44
+
+commit a214d983c2ae115c5c4965808f2bd5912c71e4c3
+Author: Chris Behrens <cbehrens@codestud.com>
+Date:   Fri Aug 10 21:06:44 2012 +0000
+
+    socket errors and timeouts should be CommunicationErrors
+    
+    Also include extra information about socket errors within the exceptions.
+    
+    Change-Id: I9464a484460d40be5727e18ca6f057df9076766e
+
+commit 3997f977fa0df34f72670e0e4a4e9e87d932b2af
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Aug 8 13:45:38 2012 -0700
+
+    Handle communication failures cleanly
+    
+    Expand exceptions to cover more failures cases. This adds
+    CommunicationFailure to represent any failures while attempting
+    to communicate with the remote endpoint. This also adds a new base
+    exception class BaseException which should be used for all non-HTTP
+    related failures.
+    
+    Change-Id: Ie3e1d45c520d816a3f491a85fde94a6c4edf295e
+
+commit 4b59f6649498dea4334c400f07e909592b01012e
+Merge: 392dfd6 227d166
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Fri Aug 10 19:40:09 2012 +0000
+
+    Merge "Client-side SSL Connection"
+
+commit 392dfd6d0db33659ec3665513f42a100fea4a3de
+Merge: 137b3cf ff34cfc
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Fri Aug 10 18:35:33 2012 +0000
+
+    Merge "SSL Certificate Validation"
+
+commit 137b3cf975d73437943e100065c76b83acfa7dd3
+Author: Lars Gellrich <lars.gellrich@hp.com>
+Date:   Wed Aug 1 16:04:37 2012 +0000
+
+    Enable client V2 to download images
+    
+    Added the CLI option image-download to download an image via API V2.
+    Added utility function to save an image.
+    Added common iterator to validate the checksum.
+    
+    Related to bp glance-client-v2
+    
+    Change-Id: I0247f5a3462142dc5e9f3dc16cbe00c8e3d42f42
+
+commit 354c98b087515dc4303a07d1ff0d9a9d7b4dd48b
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Aug 8 11:14:18 2012 -0700
+
+    Refactor HTTP-related exceptions
+    
+    * Refactor helper function that builds the map of http status codes
+      to local http exceptions - now we don't have to explicitly list
+      every single exception name
+    * Add several exceptions to represent http status codes that were not
+      previously represented
+    * Improve consistency of exceptions naming by prepending 'HTTP' to
+      necessary exception names
+    * Use HTTPException instead of ClientException
+    * Deprecate old http exceptions (those that aren't prefixed with HTTP)
+    * Deprecate ClientException
+    * Deprecate unused NoTokenLookupException and EndpointNotFound
+    * Add test module to spot-check the from_response helper
+    
+    Change-Id: Ibc7fef9e2a5b24bd001d183d377901f302d650a9
+
+commit 3a68f75b95ed7807aee6cc245ea175ac35a09b11
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Aug 8 10:08:33 2012 -0700
+
+    Simplify v2 schema lookup
+    
+    We don't need to look at the container of available schemas in order
+    to get the one we want. Remove glanceclient.exc.SchemaNotFound as it can
+    no longer be raised.
+    
+    Change-Id: Ib49ad58c4fdfc9bc9f535115674d92040a97db65
+
+commit 127463e14dd61507f97b2bf19aa318e3a6e5d591
+Merge: 6209852 13d80a7
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Wed Aug 8 17:55:22 2012 +0000
+
+    Merge "Add missing copyright headers"
+
+commit 62098527b932bd8b8cdd5328269ec0c89a0bd74d
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Aug 7 20:30:20 2012 -0700
+
+    legacy_shell.py shouldn't be executable
+    
+    Change-Id: Ife6e9e47ece3971a3872e781a39e30bcb38e3bf7
+
+commit 227d166109d6b35f44a1247c1127b2593fc1b9ec
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Thu Aug 2 15:30:50 2012 -0700
+
+    Client-side SSL Connection
+    
+    This allows a user to pass a cert and a key to use in HTTPS
+    connections. The flags --cert-file and --key-file are added
+    to the CLI.
+    
+    Addiionally, update the debug curl logging to print --cacert and
+    -k when ca_file and insecure are set.
+    
+    Related to bp glance-client-parity.
+    
+    Change-Id: Ibaea51419a903afb7939a6b5b848f7a6667893bf
+
+commit ff34cfc50f3e030671362f42fbba58e11e5fb23d
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Thu Aug 2 14:16:13 2012 -0700
+
+    SSL Certificate Validation
+    
+    This adds support for validation of ssl certs returned by remote
+    servers over SSL. The --ca-file param represents the CA cert used
+    to sign the remote server's cert. Use --insecure if the remote
+    server is using a self-signed cert or you don't have the CA cert.
+    
+    Related to bp glance-client-parity
+    
+    Change-Id: I45253a6e2d88da599addfcc464571e62ae920166
+
+commit 18543b1a46cad3e01613c4b5c933b7dfb68e048b
+Merge: 61fdefb 2541f3c
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Fri Aug 3 00:29:25 2012 +0000
+
+    Merge "Allow CLI opts to override auth token and endpoint"
+
+commit 13d80a7e8f9e3d05c3ef6e4812c8daee027fbfdc
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Thu Aug 2 14:22:27 2012 -0700
+
+    Add missing copyright headers
+    
+    A few files were missing copyright headers:
+    * glanceclient/common/http.py
+    * glanceclient/v1/__init__.py
+    * glanceclient/exc.py
+    
+    Change-Id: Ibbd53cd49f9367994de66a30601b3aefe1a8d6ee
+
+commit 61fdefbdd89284b53f60a172d27f8cde6f9223e7
+Merge: a511e6a ba83562
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Thu Aug 2 18:12:43 2012 +0000
+
+    Merge "Update python-keystoneclient version dependency"
+
+commit a511e6a05e0f8763fb57dea3af86602a7883604c
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Aug 1 19:43:58 2012 -0700
+
+    Add legacy compat layer to v1 shell
+    
+    All legacy CLI commands should work as expected with a few
+    minor exceptions:
+    - no upload animation
+    - no interactive pagination
+    - help/usage output has changed
+    
+    Deprecated options are indicated as such in their usage info. Deprecated
+    commands have descriptions that label them as such.
+    
+    Related to bp glance-client-parity
+    
+    Change-Id: I584b2447361967228bea332e14880e18db12fca8
+
+commit 2541f3ce840492555160f8f31d775f443628fe9a
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Thu Jul 26 16:10:42 2012 -0700
+
+    Allow CLI opts to override auth token and endpoint
+    
+    Previously, both --os-auth-token and --os-image-url had to be
+    provided in order for either of them to be used in any API requests.
+    This breaks the tie between them and allows a user to override
+    either the auth token or the endpoint returned by Keystone independently
+    of one another.
+    
+    Fixes bug 1029586
+    
+    Change-Id: I8b81be723286c546d9cbd97c8b7d7aa89c03b2d4
+
+commit ba83562b24f735c1ae9b9e5edefe8f2f1466b233
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Aug 1 16:22:23 2012 -0700
+
+    Update python-keystoneclient version dependency
+    
+    We need version v0.1.2 for the 'insecure' keyword to work in
+    keystoneclient.v2_0.client.Client
+    
+    Change-Id: I0f8564d5e9067f8e7fcc2f3fb48cd09757977f38
+
+commit 5f5d8ee212bce06f1e964ff1db6c1c4ca41a351b
+Merge: dc7f781 6c8e034
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Thu Aug 2 00:19:01 2012 +0000
+
+    Merge "Refactor http request/response logging"
+
+commit dc7f7817ca694ad0072024d3412122066254139a
+Merge: c24ea3f 1f44aff
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Wed Aug 1 23:58:19 2012 +0000
+
+    Merge "Add exceptions for 500 and 503 HTTP status codes"
+
+commit c24ea3f84876ca4087710fc15a94c1a82ec1d5f0
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Jul 30 20:50:27 2012 -0700
+
+    Stop looking for v2 image in container
+    
+    The v2 API no longer returns images in JSON containers like
+    '{"image": {...}}', so stop trying to decode the responses
+    as if it does.
+    
+    Fix bug 1031185
+    
+    Change-Id: I5209fe76445d4195b12944146a0ef190883f363f
+
+commit 5189d58d6363f2f73ef2bd43eb56fd34ea611e28
+Merge: bb0b59b d004b1a
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Tue Jul 31 03:39:33 2012 +0000
+
+    Merge "Fix coverage reporting test."
+
+commit bb0b59bda131c9f1a65ffe99d95822fc29c5e59d
+Merge: 158f7cc bb28293
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Tue Jul 31 03:38:44 2012 +0000
+
+    Merge "Honor '--insecure' commandline flag also for keystone authentication"
+
+commit 1f44aff399e9ed6008d96b047a7c82623b980e0a
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Sun Jul 29 23:08:02 2012 -0700
+
+    Add exceptions for 500 and 503 HTTP status codes
+    
+    Add glance.exc.InternalServerError and .ServiceUnavailable to
+    represent HTTP statuses 500 and 503. Users will definitely see
+    these from Glance, so let's be nice and map them to handy
+    exception classes.
+    
+    Change-Id: I8e8fcda532455793ea4d0f08a23f7c92b68c186c
+
+commit 6c8e0342c0a7c285dab2606cab1b2cc9c3b5b90a
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Sun Jul 29 22:12:37 2012 -0700
+
+    Refactor http request/response logging
+    
+    Using the --debug flag or the GLANCECLIENT_DEBUG env var, a user will
+    see http requests and responses in great detail. Requests are formed
+    into proper curl commands while responses are printed just as they would
+    as if the curl request provided were executed. Response bodies will not
+    be printed if they are application/octet-stream.
+    
+    Change-Id: I9c9c5d6ec9f481091c944e596d073da3739795b6
+
+commit 158f7ccd743b9fee12d60b10cf0fe696d5d4ed34
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Sun Jul 29 21:08:26 2012 -0700
+
+    Fix --debug CLI option
+    
+    The --debug argument has been ignored since httplib2 was replaced
+    with httplib. This re-enables the --debug flag as an equivalent
+    to the env var GLANCECLIENT_DEBUG.
+    
+    Fixes bug 1030700
+    
+    Change-Id: Ib653049eea2f18c4cc2f8f8aac7884245afd0f04
+
+commit d004b1a73a395379846464950153f7cc04cdc918
+Author: Clark Boylan <clark.boylan@gmail.com>
+Date:   Fri Jul 27 14:39:58 2012 -0700
+
+    Fix coverage reporting test.
+    
+    A change was committed that modified the
+    glanceclient.common.__init__.py file that seems to conflict with the
+    NOSE_WITH_COVERAGE environment variable. Run the coverage tests like
+    novaclient and swiftclient to get around this problem.
+    
+    Change-Id: Id9a655a0207d3b16a619972ebaecc87387cf784e
+
+commit bb282936a01221821988d51a3896907f8c3404ff
+Author: Sascha Peilicke <saschpe@suse.de>
+Date:   Thu Jul 26 15:48:23 2012 +0200
+
+    Honor '--insecure' commandline flag also for keystone authentication
+    
+    Currently, keystone auth fails with self-signed certificates.
+    
+    Change-Id: Ice89bcd0662038260bc4bd12058972bb35e61e3b
+
+commit 1e744f162ece85f14120a16180ed0f83fe9f1e09
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Jul 10 20:51:00 2012 -0700
+
+    Replace httplib2 with httplib as http driver
+    
+    * This allows us to send truly chunked responses to users
+    * Handle bad connection url schemes with a new InvalidEndpoint exception
+    * Fixes bug 1023240
+    
+    Change-Id: I34500987f51d4e0c6e1f89ecf93853de3fcbb1c3
+
+commit 71a0caece87727e07bc34ae265dda58ca3e1e6d2
+Author: Sascha Peilicke <saschpe@suse.de>
+Date:   Fri Jul 20 10:18:02 2012 +0200
+
+    Clarify usage of --insecure flag
+    
+    Change-Id: If19a7aab92350fb68e447a0ffe8a97e079d762e4
+
+commit 070f176abf0f3f592469be385c3c530de19eba16
+Merge: 0f628b1 c201f24
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Thu Jul 19 21:26:04 2012 +0000
+
+    Merge "Relax prettytable dependency to v0.6.X from v0.6"
+
+commit 0f628b19cbbe53ea29de02f4ae84bc893138820f
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Sat Jul 14 04:39:27 2012 +0000
+
+    Add pagination to v1 image-list
+    
+    * Use recursive generator function to make subsequent requests
+      to the v1 detailed images resource
+    * 'limit' continues to act as the absolute limit of images to return
+      from a list call
+    * 'page_size' indicates how many images to ask for in each subsequent
+      pagination request
+    * Expose --page-size through the cli
+    * Convert v1 images tests to use strict url comparison
+    * Drop strict_url_check from FakeAPI kwargs - now the functionality
+      is always active and tests must directly match fixture urls
+    * Fix bug 1024614
+    
+    Change-Id: Ifa7874d88360e03b5c8aa95bfb9d5e6dc6dc927e
+
+commit 570e64d91f3b85ef6c4586f7b3a59183e5bb1d3e
+Merge: 5f380c1 da36046
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Thu Jul 19 20:19:30 2012 +0000
+
+    Merge "Wrap image data in iterator"
+
+commit 5f380c1f91debaa8aa000f221af4ff02bce7bc98
+Merge: a8a3f4d d88d8fc
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Wed Jul 18 01:56:22 2012 +0000
+
+    Merge changes Ib98e912a,Ib98e912a
+    
+    * changes:
+      Add pagination to v2 image-list
+      Prevent links from being printed in v2 CLI
+
+commit a8a3f4d67b02225cd3831ae10fb52504b8a0c5ac
+Merge: 6206f42 8bf9e11
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Wed Jul 18 01:02:07 2012 +0000
+
+    Merge changes Ib98e912a,Ib98e912a,Ib98e912a,Ib98e912a,Ib98e912a
+    
+    * changes:
+      Align print_dict to the left
+      Convert v2 images list method to generator
+      Replace static v2 Image model with warlock model
+      Add support for viewing a single image through v2
+      Rewrite link parsing for finding v2 schemas
+
+commit 6206f420284c77f6c0b2d46b05c5ddc3df99d785
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Jul 10 16:32:01 2012 -0700
+
+    Update README usage examples
+    
+    * Update the python snippet to reflect reality
+    * Fix broken links
+    * Remove superfluous text
+    
+    Change-Id: I4b7e9aae35cc49e5fa89ca33d2399784c2afd029
+
+commit c201f24d5ad0a4ad008921664d956b7d0ac2dd61
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Jul 17 15:29:51 2012 -0700
+
+    Relax prettytable dependency to v0.6.X from v0.6
+    
+    Change-Id: Ide7247ba444b60179d9c76c43dfaa43c025b69c9
+
+commit d88d8fc46286cf542f8b0553734ac9ff1b192773
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Sat Jul 14 03:06:03 2012 +0000
+
+    Add pagination to v2 image-list
+    
+    * Use a recursive generator function to iterate over the image
+      container. The presence of next links are indicators to
+      continue pagination while their value drives the location of
+      the next page.
+    * A user can pass in --page-size on the command line, or page_size
+      when using the controller directly, to control how many images
+      are requested with each subsequent paginated request. Default page
+      size is 20.
+    * Add a flag (strict_url_check) for the FakeAPI class to control
+      whether it chops off query params when trying to match a request
+      to a fixture.
+    * Related to bp glance-client-v2.
+    
+    Change-Id: Ib98e912a7af0bb570b4fd738733edd9b837d1a12
+
+commit 95a7f9dffeae6d108c7e22475efca7df9d5ffd97
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Sat Jul 14 02:02:58 2012 +0000
+
+    Prevent links from being printed in v2 CLI
+    
+    Nobody wants to see links in a human interface. This prevents the
+    file, access, self and schema links from being printed when calling
+    image-show or explain.
+    
+    Related to bp glance-client-v2
+    
+    Change-Id: Ib98e912a7af0bb570b4fd738733edd9b837d1a11
+
+commit 8bf9e112447f97b57d744465cef99b823f544c03
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Sat Jul 14 01:54:29 2012 +0000
+
+    Align print_dict to the left
+    
+    Change-Id: Ib98e912a7af0bb570b4fd738733edd9b837d1a10
+
+commit e5f038b62a9edf3f19390f2437c8a10616426903
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Sat Jul 14 01:16:31 2012 +0000
+
+    Convert v2 images list method to generator
+    
+    We will want this to be a generator as soon as we implement
+    pagination. Let's establish the interface now.
+    
+    Related to bp glance-client-v2
+    
+    Change-Id: Ib98e912a7af0bb570b4fd738733edd9b837d1a07
+
+commit c398af18b0b8fb5fb075be22563812e179290b2a
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Sat Jul 14 01:11:22 2012 +0000
+
+    Replace static v2 Image model with warlock model
+    
+    * Add warlock v0.1.0 as a dependency
+    * Generate a pythonic, self-validating Image model using warlock
+    * Add raw method to Schema model
+    * Related to bp glance-client-v2
+    
+    Change-Id: Ib98e912a7af0bb570b4fd738733edd9b837d1a04
+
+commit b6cef9d145f870dd717843751f0c5d68867e07d5
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Fri Jul 13 23:05:38 2012 +0000
+
+    Add support for viewing a single image through v2
+    
+    * Add image-create command
+    * Add tests for Image model, Controller.get, and Controller.list
+    * Related to bp glance-client-v2
+    
+    Change-Id: Ib98e912a7af0bb570b4fd738733edd9b837d1a06
+
+commit f0445a1b443182cf77e27038cc5f90c424e00c62
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Fri Jul 13 22:03:22 2012 +0000
+
+    Rewrite link parsing for finding v2 schemas
+    
+    What we called 'links' are no longer returned in a container of
+    objects, they are top-level entity attribtues. This fixes the
+    parsing of the entities to look in the correct place when trying
+    to locate a specific schema.
+    
+    Add a helper for printing to stderr and exiting with a non-zero
+    exit code.
+    
+    Map 'name' to 'Attribute' when explaining a schema.
+    
+    Related to bp glance-client-v2
+    
+    Change-Id: Ib98e912a7af0bb570b4fd738733edd9b837d1a05
+
+commit 53acf1a0ca70c900267286a249e476fffe078a9f
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Thu Jul 12 18:30:54 2012 -0700
+
+    Establish the supported importable interface
+    
+    * Consumers of this client should not depend on being able to import
+      any module other than glanceclient and glanceclient
+    * The only attributs of the glanceclient module are Client
+      and __version__
+    * The attributes of the glanceclient.exc modules have yet to be
+      locked down
+    * glanceclient.common.exceptions was replaced with a placeholder
+      module until consumers of it are updated
+    
+    Change-Id: Iea9648cd06906d65764987c1f2ee5a88ebeee748
+
+commit 49bc6f94f29ee7286601be0451ab3dafc82a0750
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Jul 11 15:28:46 2012 -0700
+
+    Add --is-public to image-create
+    
+    This moves image-create closer to image-update by adding
+    --is-public and hiding the help output of --public. The
+    --public option will be removed once devstack no longer
+    depends on it.
+    
+    Fix bug 1023632
+    
+    Change-Id: I2c58655ba56eef1fa486246618c4fb5bd3c6c8cf
+
+commit c0974328284a99b3c674ca0612277f201a6a1ab8
+Merge: 1a8ab3c b7f476e
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Thu Jul 12 22:55:10 2012 +0000
+
+    Merge "Translate is_protected to protected"
+
+commit 1a8ab3c3f258d644f7ee1808ebb411ec2a5a2ef3
+Merge: 4e9bac2 d8433ee
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Thu Jul 12 22:55:02 2012 +0000
+
+    Merge changes I02ddeb59,Ife231377
+    
+    * changes:
+      Change --protected to --is-protected in create
+      Properly map boolean-like arguments to True/False
+
+commit 4e9bac2d0a8dc3a5dbdec51854621cf57df5730c
+Merge: a814c15 d2ab652
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Thu Jul 12 19:42:38 2012 +0000
+
+    Merge "Remove AuthorizationFailure exception"
+
+commit da360462a54501178753571cdfec800e899f38ae
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Jul 11 19:34:28 2012 -0700
+
+    Wrap image data in iterator
+    
+    This is establishing the API for a future optimization. We want to
+    be able to offer true socket-level caching, but can't do that with
+    httplib2 right now. For now, we will just fake the optimization
+    by returning an iterator over the image body, which happens to already
+    be fully loaded into a string.
+    
+    Change-Id: I2d36e3cdd45b26d7c7c27ba050bf6a4b5765df6c
+
+commit b7f476e2112c7d272bbf1e508f2aa8c4641efe68
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Jul 11 16:32:53 2012 -0700
+
+    Translate is_protected to protected
+    
+    When creating or updating an image, translate the 'is_protected'
+    argument into the proper 'protected' image attribute.
+    
+    Fix bug 1023653
+    
+    Change-Id: Icfe6c38e4fda098ce3f90fd94c8fbbc18be2f4a8
+
+commit d8433ee40a6a8ea3af70572ad1928edd09636309
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Jul 11 16:19:08 2012 -0700
+
+    Change --protected to --is-protected in create
+    
+    Make image-create match image-update when specifying a specific
+    value for 'protected'.
+    
+    Fix bug 1023650
+    
+    Change-Id: I02ddeb59c1f6882b206279a71f7af8889ce4602c
+
+commit db1fabed118a771dfb85024c67ae348119aec412
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Jul 11 16:25:13 2012 -0700
+
+    Properly map boolean-like arguments to True/False
+    
+    --is-public and --is-protected are now evaluated as True and False
+    
+    Fix bug 1023652
+    
+    Change-Id: Ife2313770eebc176e7744711956aed20f16576a5
+
+commit a814c154652312e6c5f40674933275a0a6d2c647
+Author: Monty Taylor <mordred@inaugust.com>
+Date:   Wed Jul 11 11:08:58 2012 -0500
+
+    Add ability to get version information in python
+    
+    * A user can access glanceclient.__version__ to get a string
+      representing the version of the installed library.
+    * Add openstack-common's 'version' module.
+    
+    Change-Id: Ib14c561d8ac0b126617a20acfbd5fdb61c54f2c7
+
+commit c315c5274f8271c83550420236cd28fc1ffa2dd0
+Author: Monty Taylor <mordred@inaugust.com>
+Date:   Wed Jul 11 10:44:36 2012 -0500
+
+    Latest setup goodness.
+    
+    Upgrade the common setup code to the latest versions, and use setuptools-git
+    for sdist tarball generation.
+    
+    Change-Id: I81eca9199b7d330ef8ec80482565a75f8475a78c
+
+commit d2ab65255f6b9ee0b35fd669f4b35348ba107dd3
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Jul 10 21:10:40 2012 -0700
+
+    Remove AuthorizationFailure exception
+    
+    The AuthorizationFailure exception isn't used anywhere, so
+    remove it.
+    
+    Fix bug 1015940.
+    
+    Change-Id: Ie6da74b63e3d1658c8ae26c272222f00f1209e38
+
+commit cf8613e76d4682c924a900a17b43197d569d7ad3
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Jul 9 15:39:29 2012 -0700
+
+    Preserve image properties on update
+    
+    * By default, image properties should not be deleted on image update.
+    * A user can specify --purge-props through the CLI or purge_props
+      as a keyword argument to ImageManager.update to override the default
+      behavior and force properties to be deleted.
+    * Fixes bug 1022758
+    
+    Change-Id: Ib079378cb765552fc29a66913aefbbcd934d2065
+
+commit 0e8ab72357b5caf9850a6a49eda718311cefe269
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Jul 9 15:18:44 2012 -0700
+
+    Add --file to image-update and correct bad name
+    
+    * Add the --file option to the image-update action, as it was left out
+      of a previous patch
+    * Additionally, change a bad reference (args.fields) to args.file
+    * Fix bug 1022750
+    
+    Change-Id: Idde127ec3f138f718d671b2133d50debec26236e
+
+commit 88a039488bcaa9e06f7eee0fada123ae24b5ba4a
+Merge: 7a2b397 a1691dd
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Mon Jul 9 17:42:13 2012 +0000
+
+    Merge "Allow image filtering by custom properties"
+
+commit 7a2b39727b883d5a0bb6d33ef1e8fb0d2265f268
+Merge: 12c51bb e7db533
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Mon Jul 9 17:42:11 2012 +0000
+
+    Merge "Expand v1 image-list filters"
+
+commit 12c51bbcad9fadf289792d39ee510b8a1221d6fd
+Merge: ce806d6 b05a9c0
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Mon Jul 9 17:42:10 2012 +0000
+
+    Merge "Add --timeout option to cli"
+
+commit ce806d615b5e9c1ac4b7e3c42ee9fa08092069a1
+Merge: cc9e28a 9aad246
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Mon Jul 9 17:34:41 2012 +0000
+
+    Merge "Add size filtering to image-list action"
+
+commit cc9e28a4c16686a2ea29640bcc7d04c3de1388f0
+Merge: 2713ca1 ac7121f
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Thu Jul 5 20:56:15 2012 +0000
+
+    Merge "Use PyPI for keystoneclient."
+
+commit a1691ddc10b7fa4df0ff8a434d060ee1762773c0
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Jul 4 15:46:29 2012 -0700
+
+    Allow image filtering by custom properties
+    
+    A user can filter a list of images by passing in a 'properties'
+    sub-dictionary inside of the 'filters' keyword argumen to
+    ImageManager.list(). The same functionality can be used through
+    the CLI through the use of one or more'--property-filter' options.
+    
+    Related to bp glance-client-parity.
+    
+    Change-Id: I7d119174d83faa894dde557e1944289de296a02c
+
+commit e7db533bc0222f912ec0405e101e3dafbd49ece3
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Jul 4 15:24:08 2012 -0700
+
+    Expand v1 image-list filters
+    
+    Add comparison filters for the v1 image-list command: --name,
+    --status, --container-format, --disk-format.
+    
+    Related to bp glance-client-parity.
+    
+    Change-Id: I27377764ea5543a4bef593f0a731b09a914a9265
+
+commit b05a9c0200f68426b162a23ca6e6612381a1d1b7
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Jul 4 14:32:52 2012 -0700
+
+    Add --timeout option to cli
+    
+    Create a --timeout option to allow users to provide a custom timeout
+    for requests from the command line. The timeout functonality already
+    exists in both v1 and v2 client classes.
+    
+    Related to bp glance-client-parity
+    
+    Change-Id: Ic91de5eae2824b37f6aad3adc5fda28b9674250e
+
+commit 9aad246f0e97942bdfd58b755855af3b8453734a
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Jul 4 14:24:38 2012 -0700
+
+    Add size filtering to image-list action
+    
+    Add --size-min and --size-max options to image-list to
+    represent the size_min and size_max filters passed to
+    the ImageManager.list method.
+    
+    Related to bp glance-client-parity
+    
+    Change-Id: Icb5458c3ed26ea754cff6360b741b3af99d1beb5
+
+commit 2713ca1bdce9ae5d01fa04722bb4d55b3fa1b12d
+Author: Adam Gandelman <adamg@canonical.com>
+Date:   Mon Jun 25 19:04:28 2012 -0700
+
+    Allow image upload from local file to v1 API
+    
+    Allow an image to be read from a local file as an alternative to
+    stdin (which remains the default).
+    
+    Change-Id: I81070ded9c505df7924c4efd5ae54cf3c0fa534d
+
+commit ac7121fc0e7ad437858cdf7dfe7a529961406adc
+Author: Monty Taylor <mordred@inaugust.com>
+Date:   Mon Jul 2 17:46:16 2012 -0400
+
+    Use PyPI for keystoneclient.
+    
+    Change-Id: Ib1ce43cde3e6848a873778dd9fc6aa4709df6452
+
+commit e9b8f8ec2fddb07d5d5e8cf1745e8e4720dd78da
+Author: Dan Prince <dprince@redhat.com>
+Date:   Wed Jun 27 12:04:01 2012 -0400
+
+    Switch CLI to support underscores and dashes.
+    
+    Update the glanceclient CLI to support both underscores and dashes.
+    
+    Dashes are prefered and show up in help.
+    
+    This will hopefully keep the CLI more consistent with the other
+    OpenStack client projects like Nova, Swift, Keystone in addition to the
+    old Glance client which all seem to prefer underscores to dashes.
+    
+    Fixes LP Bug #1018467.
+    
+    Change-Id: I80d7a19f94033554f7f639166911726de4a5159f
+
+commit 089d509f350b01c8345cfb7b9b33510a60043861
+Author: Monty Taylor <mordred@inaugust.com>
+Date:   Tue Jun 26 13:58:07 2012 -0500
+
+    Split reading of versioninfo out into a method
+    
+    Make the read_versioninfo to match write_versioninfo.
+    
+    Additionally, there is an edge case where if the code is installed from a
+    github zipball, versioning info is missing. Now that we're using this,
+    there should be virtual no instances where a zipball will be easier or
+    less cost than an sdist created tarball, all of which should be public and
+    accessible, but during the transition, we need to account for the codepath.
+    
+    Change-Id: Icd3fe97c6341bb04da27adc55a85f1ab6b525c46
+
+commit 993a7b7dd670f9ea9ade230bd48519b83af85dbf
+Merge: d6e0a03 03efd16
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Tue Jun 26 16:58:08 2012 +0000
+
+    Merge "Add support for tag-based version numbers."
+
+commit 03efd1689616ada606cb4cd7c0b51d2e1935ecfa
+Author: Monty Taylor <mordred@inaugust.com>
+Date:   Mon Jun 25 09:49:59 2012 -0500
+
+    Add support for tag-based version numbers.
+    
+    Change-Id: I9b0e24f65e9b79c39bdf279b7af9c1040ded7952
+
+commit d6e0a03a937841ee509c37003762fd92c9b762ef
+Author: Bhuvan Arumugam <bhuvan@apache.org>
+Date:   Sat Jun 23 22:27:11 2012 -0700
+
+    Support --os-endpoint-type in glanceclient.
+    
+    Bug: 993993
+    
+    * glanceclient/shellp.py
+      OpenStackImagesShell.get_base_parser(): Parse --os-endpoint-type
+      argument. Default to one defined in os.environ.
+      OpenStackImagesShell._authenticate(): Define endpoint type based
+      on command line argument. Use 'publicURL', if it's not specified
+      in command line and also not defined in os.environ.
+      OpenStackImagesShell.main(): Pass this value to authenticate.
+    
+    Change-Id: I0c0cde5212198eec2a7d75fb2a7cad1cde048c7c
+
+commit 99e872a57bf20390949534e94c3929851e827d82
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Thu Jun 21 13:06:18 2012 -0700
+
+    Hook up GET /v1/images/<id>
+    
+    This allows us to get raw image data out of the API! Related to
+    bp glance-client-parity
+    
+    Change-Id: Id5f55553d2ff3b7bf58515062afdfd4b9b183a54
+
+commit 6e1157059efdaed3a0d638efc6b4a1e4db955832
+Author: Monty Taylor <mordred@inaugust.com>
+Date:   Wed Jun 13 15:55:21 2012 -0400
+
+    Add initial docs.
+    
+    Change-Id: I1f8407597105a914945c932ff55945c8005e273c
+
+commit a8d7043266a5cb070b602b13cf7a7421cffe8467
+Author: Clark Boylan <clark.boylan@gmail.com>
+Date:   Fri Jun 8 15:22:23 2012 -0700
+
+    Edit build_sphinx options.
+    
+    To better facilitate the building and publishing of sphinx
+    documentation by Jenkins we are moving all openstack projects with
+    sphinx documentation to a common doc tree structure. Documentation
+    goes in project/doc/source and build results go in project/doc/build.
+    
+    Change-Id: Idf3e4472f91a1f5ae36e64b339bef99d4d960b88
+
+commit 0d53efe930045bf8dbcb3083ddd0c5871aa1a06b
+Merge: 0246e99 7f48506
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Fri Jun 8 21:29:59 2012 +0000
+
+    Merge "Add 'explain' command to v2 that describes schemas"
+
+commit 0246e99817701a25392042ec3b2cb9ce6e2b27f3
+Merge: 2822748 1c3db6c
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Thu Jun 7 22:43:34 2012 +0000
+
+    Merge "Minimize tox.ini"
+
+commit 1c3db6c756aee53d1acbdaff3c45b144d6d45d8b
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Thu Jun 7 14:51:29 2012 -0700
+
+    Minimize tox.ini
+    
+    Change-Id: I77d0873cbd789726b93b059429d742f1cbdc57c1
+
+commit 7f48506781ea1a50ed7760c41a34474f91979f06
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Thu Jun 7 14:01:50 2012 -0700
+
+    Add 'explain' command to v2 that describes schemas
+    
+    At its core, this is adding the ability to finx a schema through
+    published links and convert it to a usable object.
+    
+    Related to bp glance-client-v2
+    
+    Change-Id: I7b38ad091c6b0ad80197eb789503cf73989893e5
+
+commit 2822748bc134724c43f327041428557b7bfc3e3a
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Thu Jun 7 14:41:14 2012 -0700
+
+    Stick prettytable at v0.6
+    
+    Doing this so we can align columns reliably
+    
+    Change-Id: Ibdbc6f3df08d6f9c45b6e0a0f5a2440ba2637dbd
+
+commit 0935e38113b5db8f2611afd0cff66a1d74a52c0e
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Thu Jun 7 14:37:56 2012 -0700
+
+    Add tests dir to pep8 command
+    
+    Change-Id: I28120c67e157277202976696eea37023fb719d6d
+
+commit 2e81493192ac367211d3fa04feab7d161075409e
+Merge: bcff183 a1f8ea1
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Wed Jun 6 20:48:14 2012 +0000
+
+    Merge "Auto generate AUTHORS file for glanceclient component."
+
+commit bcff183f9a14d255b778a4b8af5869f85bf171b2
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Jun 4 09:01:39 2012 -0700
+
+    Set pep8 dependency at v1.2
+    
+    Additionally, remove the pep8 dep override in tox.ini so the dep we
+    set in tools/test-requires is actually used
+    
+    Change-Id: Iceb6d7a5dd8eceeebc1408e8a5edfabb48462d3e
+
+commit 4b62848a4cbfe8d270a3386fcd43393bbefb973f
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Thu May 17 14:33:43 2012 -0700
+
+    Add minimal support for the v2 API
+    
+    This only allows you to run image-list, but sets up a framework
+    that we can use to fill in the rest of the v2 functionality.
+    
+    * Related to bp glance-client-v2
+    
+    Change-Id: I8827e36fdcf79fe402990a6d05898ec00cbd54c6
+
+commit a1f8ea1c7f9849e0fb64c547d6456d2c3c38c5e8
+Author: Bhuvan Arumugam <bhuvan@apache.org>
+Date:   Fri Jun 1 23:38:12 2012 -0700
+
+    Auto generate AUTHORS file for glanceclient component.
+    
+    Bug: 976267
+    
+    Now that git commits are gated by CLA, we shouldn't enforce
+    committers to add an entry in AUTHORS file. The AUTHORS file
+    should be generated automatically, based on git commits.
+    
+    This commit fixes the problem.
+    
+    * AUTHORS
+      Remove this file.
+    
+    * .gitignore
+      Add AUTHORS file.
+    
+    * glanceclient/openstack/common/setup.py
+      Sync changes from openstack-common.
+    
+    * setup.py
+      Generate AUTHORS file before creating the package.
+    
+    * glanceclient/shell.py
+      Pep8 fix.
+    
+    * tests/test_authors.py
+      Remove this test case.
+    
+    Change-Id: I9e9d4da5ca3b147b483250dcf25a3b2a840123c2
+
+commit b9b897252868732763de60d829b5c8de188adf38
+Author: Chuck Short <chuck.short@canonical.com>
+Date:   Tue May 29 08:31:48 2012 -0400
+
+    Include ChangeLog in tarball
+    
+    Include ChangeLog when generating the tarball.
+    
+    Change-Id: I4a65b82928e3f55775cfa5d3d51b3c3b4e1ef079
+    Signed-off-by: Chuck Short <chuck.short@canonical.com>
+
+commit 32ba1385ef907eba02a77ba1c3ea3ef1b60b8da6
+Author: Monty Taylor <mordred@inaugust.com>
+Date:   Fri May 25 11:30:01 2012 -0400
+
+    Properly install from zipball.
+    
+    Change-Id: I505a42ec11b388e3ee5c818a1aadf0f70d5565c5
+
+commit 405d2494e382d9fcd6735883fcfd9dd13bf943e0
+Author: Michael Basnight <mbasnight@gmail.com>
+Date:   Thu May 24 22:35:14 2012 -0500
+
+    Adds support for --insecure.
+    
+    fixes lp#1004281.
+    
+    Change-Id: I464e39515a7172bfb72921a92f46d31baac466d8
+
+commit a0f6ef9c6bf0469c6b1328184f3fe0a97884f6cc
+Author: Monty Taylor <mordred@inaugust.com>
+Date:   Thu May 24 09:46:38 2012 -0400
+
+    Fix the zipball change.
+    
+    -f downloads things from a url. -e does them for vcs.
+    
+    Change-Id: I14c5edd0ca163112baea08c81771f35f13930264
+
+commit ee7ea1648183215e10736a42c736ac02ed9bee8a
+Author: Monty Taylor <mordred@inaugust.com>
+Date:   Wed May 23 11:09:43 2012 -0400
+
+    Replace git url with github zipball.
+    
+    distribute does not grok git urls, but auto-generated zipfiles are a
+    short-term workaround until we've got pypi uploads sorted.
+    
+    Fixes bug 1003328
+    
+    Change-Id: Iaded7245cea7a30c2f421c7b48ece9823aaf152f
+
+commit 995372fff77677991fe50adf3e9a35deac867f7b
+Merge: 78cd3d9 3943699
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Tue May 22 23:55:35 2012 +0000
+
+    Merge "Refactor HTTPClient to use two request methods"
+
+commit 394369942700567da767b85920e0b3890119a764
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue May 15 10:01:47 2012 -0700
+
+    Refactor HTTPClient to use two request methods
+    
+    Rather than depend on magic, I would prefer that we explicitly call
+    two different request methods: json_request and raw_request. The
+    former will encode/decode request bodies to and from JSON, while
+    the latter will not.
+    
+    Change-Id: I6a429a5975993f71df85df55f11c5d51c050c289
+
+commit 78cd3d9e162cf8a9d3f50433fad094fbc9e75e3a
+Author: Thierry Carrez <thierry@openstack.org>
+Date:   Tue May 22 11:37:58 2012 +0200
+
+    Add missing files to MANIFEST.in
+    
+    Some files were missing from tarballs generated using
+    'python setup.py sdist', this adds them to MANIFEST.in.
+    Fixes bug 1001217.
+    
+    Change-Id: I0c99deba3f24989b34cff27b5d3cd1c999cd08fa
+
+commit 623a0898f8d36beeb1cb7523fde7339bbe10e0bd
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Thu May 17 14:37:21 2012 -0700
+
+    Add importutils from openstack-common
+    
+    As a side-effect, openstack.common.setup is getting updated
+    
+    Change-Id: I9f8696ec5c82ef32872e1a974102dcd179eb70f9
+
+commit 399d0bbdefd66cf47fa1e21402adc2fad6b40bbf
+Author: Michael Basnight <mbasnight@gmail.com>
+Date:   Thu May 10 11:38:11 2012 -0500
+
+    Adding service type as configurable shell option
+    
+    fixes lp#997698
+    
+    Change-Id: I5179a2ed5f32a8e7253806f6f9b02de3c06913ed
+
+commit b31c272ae12e82d0ecc6d568be421a99f8014365
+Merge: 93c1755 332858d
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Mon May 7 23:36:46 2012 +0000
+
+    Merge "Remove printt"
+
+commit 332858d56b34a0bac41fc48484680f3660a2a0e5
+Author: Dean Troyer <dtroyer@gmail.com>
+Date:   Mon May 7 10:25:54 2012 -0500
+
+    Remove printt
+    
+    prettyprint 0.6 removed printt at the last minute, replace with get_string
+    
+    Fixes bug 995826
+    
+    Change-Id: I9a25efc3d723ab0208ea88fc6431a95cc9176acb
+
+commit 93c1755acdaa6166ab0d6e27f89673a9a0b4e5ee
+Author: Chuck Short <chuck.short@canonical.com>
+Date:   Mon Apr 30 08:50:02 2012 -0400
+
+    Added condition requirement to simplejson
+    
+    simplejson is a part of python 2.6.
+    
+    Change-Id: I3a1d776918c8707f21532fe3b043a039b72d6704
+    Signed-off-by: Chuck Short <chuck.short@canonical.com>
+
+commit ae58edcba737a78fcae299e0bf76e30ba5492e60
+Author: James E. Blair <jeblair@hp.com>
+Date:   Thu Apr 26 17:40:10 2012 +0000
+
+    Use tox for running tests locally.
+    
+    See: http://wiki.openstack.org/ProjectTestingInterface
+    
+    Tox can manage virtualenvs, and is currently doing so for running
+    tests in Jenkins.  It's just as, or more, useful for running tests
+    locally, so this starts the migration from the run_tests system to
+    tox.  The goal is to reduce duplicate testing infrastructure, and
+    get what's running locally on developer workstations as close to
+    what is run by Jenkins as possible.
+    
+    This patch removes run_tests.py, and the scripts that manage .venv.
+    It makes run_tests.sh call tox to facilitate the transition for
+    developers used to typing "run_tests.sh".
+    
+    Developers will need tox installed on their workstations.  It can
+    be installed from PyPI with "pip install tox".  run_tests.sh outputs
+    those instructions if tox is not present.
+    
+    New facilities are available using tox directly, including:
+    
+      tox -e py26  # run tests under python 2.6
+      tox -e py27  # run tests under python 2.7
+      tox -e pep8  # run pep8 tests
+      tox          # run all of the above
+      tox -e venv foo  # run the command "foo" inside a virtualenv
+    
+    The configuration of the openstack nose plugin is removed from
+    setup.cfg and added to the nosetests command line arguments in tox.
+    It is used when running tox from the command line, so the enhanced,
+    colorized output is visible to developers running the test suite
+    locally.  However, when Jenkins runs tox, the xunit plugin will be
+    used instead, providing output natively understood by jenkins which
+    is much more readable in that context.
+    
+    Change-Id: Id678c2fb8a5a7d79c680d3d1f2f12141f73dc8a6
+
+commit 3344eac545dc9224dca49fa937e727666f7cee2d
+Author: Gabriel Hurley <gabriel@strikeawe.com>
+Date:   Thu Apr 12 16:35:36 2012 -0700
+
+    Adds filter support to images.list().
+    
+    This existed in glance.client, and should exist in the new
+    client as well! :-)
+    
+    Change-Id: Iea8c55fcb0f0d30d6dc138072354c3f20d1288cf
+
+commit 1f106a3bd919b5b656b14ccd22c2c23b991ad4ea
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Wed Apr 25 20:11:56 2012 -0700
+
+    Add '.tox' to .gitignore
+    
+    Change-Id: Ie29752e7e4194fca4cbe82c161d7cac9ebd0848c
+
+commit a8ae91b5dfc40463b56f4302987af0800047bec5
+Merge: a88bfee 877f144
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Wed Apr 25 03:49:52 2012 +0000
+
+    Merge "Add fields to image-list"
+
+commit a88bfee9c5208aaa0613d5f06b941621deeda5e8
+Merge: 87e0948 e293676
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Wed Apr 25 03:41:40 2012 +0000
+
+    Merge "Strip version from service catalog endpoint"
+
+commit 877f1440136d8c33cd42fb10790b025d7e1c105e
+Author: Dean Troyer <dtroyer@gmail.com>
+Date:   Fri Apr 13 17:12:47 2012 -0500
+
+    Add fields to image-list
+    
+    Fields were missing from image-list that were present in the old index:
+      'Disk Format', 'Container Format', 'Size'
+    
+    Change-Id: Ia86caec1938560c56292c0f3028ee48e774d0057
+
+commit e2936766f730018aef502e61d753ac6ab0a66085
+Author: Dean Troyer <dtroyer@gmail.com>
+Date:   Mon Apr 23 17:00:39 2012 -0500
+
+    Strip version from service catalog endpoint
+    
+    This client includes the API version in the URL directly where the
+    former practice was to include it in the service catalog endpoint.
+    This change removes the version from the last component of the
+    SC endpoint (if present) for transition purposes.
+    
+    Note that this does not generalize to the other APIs
+    where the version is not the last component of the SC endpoint.
+    
+    Change-Id: Ie04c38d80b17a171482e195aa1c633b6b6974042
+
+commit 87e0948349ef257e23f8625ec3afa6275f2afa99
+Author: Dean Troyer <dtroyer@gmail.com>
+Date:   Fri Apr 13 14:30:09 2012 -0500
+
+    Fix image-create using pipelines
+    
+    The return value of ImageManager._get_file_size() is passed on to
+    the glance server in the create api call.  Returning None causes
+    the server to reject the request as malformed.
+    
+    Add dtroyer to AUTHORS
+    
+    Change-Id: I02c90e2db5fbd1e49d1516550c806f26dae83fb9
+
+commit d3185dd3b4d01a24025840c2dac166a84ba359d3
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Apr 10 09:40:36 2012 -0700
+
+    Allow tenant name to be used in authentication
+    
+    Change-Id: If0bdf67143d64172db0b665fc07c165fabc9486a
+
+commit 73ea207a390f8026b371e1037caec8cbc5d912ef
+Merge: c80e264 cc47971
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Mon Apr 9 21:57:22 2012 +0000
+
+    Merge "Updated depend processing to norms."
+
+commit c80e2640c69be06b8eb0a8205868081b15231f29
+Author: Monty Taylor <mordred@inaugust.com>
+Date:   Thu Apr 5 19:06:57 2012 -0700
+
+    Make tox cover output coverage.xml.
+    
+    Change-Id: I8719be2f627c9f2bf33e7752cdd7348c14943f7a
+
+commit 292085445b784207e76a9b9bda1657a1c041542f
+Author: Monty Taylor <mordred@inaugust.com>
+Date:   Thu Apr 5 19:04:42 2012 -0700
+
+    Add Sphinx to test-requires.
+    
+    Change-Id: I8dec9a2e80e0ad8ceb6805a731a26585d9af92b3
+
+commit 66e967685902c5074d67350d8c98b3e9a4df6302
+Merge: 9829db1 1458d0e
+Author: Jenkins <jenkins@review.openstack.org>
+Date:   Thu Apr 5 06:37:44 2012 +0000
+
+    Merge "Add AUTHORS test case"
+
+commit cc479717cf675565697d8a7d98a4b74dc41001e9
+Author: Monty Taylor <mordred@inaugust.com>
+Date:   Tue Apr 3 21:54:43 2012 -0600
+
+    Updated depend processing to norms.
+    
+    Change-Id: I843c30acaf813614def68b936eb5a982e5a9b242
+
+commit 9829db1c073be3674241caa21c38369d1b7cea73
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Apr 3 20:48:20 2012 -0700
+
+    Fixing pep8 errors
+    
+    Change-Id: I7c0ffb5626ee030fca7daf8ae10cb17e221e2133
+
+commit 1458d0ea85d0147b3cf8e2fb80ff40024c3f3c30
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Apr 3 20:18:11 2012 -0700
+
+    Add AUTHORS test case
+    
+    Change-Id: Ib81aee90fef3b2c101bb6b737e677339638b3cad
+
+commit 71036387824eed22a8053c2141239029e3b4c9d4
+Author: Monty Taylor <mordred@inaugust.com>
+Date:   Wed Mar 28 09:31:56 2012 -0700
+
+    Added gitreview file.
+
+commit 538a9e30a26b177c03d61bd7bfb48f157ea4698f
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Apr 3 19:26:38 2012 -0700
+
+    Adding id for image members
+
+commit c72e4dd2b581366c85babbda8b0a5aa23de70363
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Apr 3 17:39:32 2012 -0700
+
+    image membership management works
+
+commit b87b1b5086b0351c06865ef7b6e9e6057fead0b6
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Apr 3 17:01:48 2012 -0700
+
+    Adding support for passing image data through cli
+
+commit d1912624139eaf40f522666da3fdb840a98ab020
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Apr 3 16:00:49 2012 -0700
+
+    Image update works
+
+commit d5bb951e5f3892b6dd3121b21ac8409c57cb5cec
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Apr 3 14:43:04 2012 -0700
+
+    More complete image creation
+
+commit fc02efd1c7b033b67b1ecc6a00b06155f9948cdd
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Apr 3 10:01:49 2012 -0700
+
+    Correct keystoneclient egg name in pip-requires
+
+commit 59e586ed942b94f973ce2a36861b07a0671cfb71
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Tue Apr 3 10:01:08 2012 -0700
+
+    Adding image-create action
+
+commit d75a029a010bd90e59f1dd26099ab170a18970c7
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Apr 2 16:26:19 2012 -0700
+
+    Adding shared-images support
+
+commit ca8434f2c3c54e362b1250ca18ad3e741b14b436
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Apr 2 15:44:43 2012 -0700
+
+    Image members bones
+
+commit 664f37067790c9c27e2bcad0b9b18f5367bdca83
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Apr 2 14:08:03 2012 -0700
+
+    Basic testing
+
+commit 440ffec57577e1bf7414afaaeb13490536c1f797
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Mar 26 23:44:42 2012 -0700
+
+    Update version to 2012.2
+
+commit 883d22d032ed0fc92a3b3b66871f5da8e82b6e96
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Mar 26 23:29:20 2012 -0700
+
+    Further cleanup
+    
+    * README is now relevant
+    * Auth now properly skipped with os-image-url and os-auth-token provided
+
+commit c530de638916d29c609f66194569f57234a68289
+Author: Brian Waldon <bcwaldon@gmail.com>
+Date:   Mon Mar 26 22:48:48 2012 -0700
+
+    Basic get/list operations work
+    
+    * 'glance image-list' and 'glance image-show' work
+    * Set up tests, pep8, venv
+
+commit b5847df3e203ec83126a3cc903bca58093399b89
+Merge: 972677f 57e352a
+Author: jaypipes <jaypipes@gmail.com>
+Date:   Wed Feb 29 14:17:18 2012 -0800
+
+    Merge pull request #1 from emonty/master
+    
+    Updated support files to latest
+
+commit 57e352a070665f3dbc2a90d53c34521178669836
+Author: Monty Taylor <mordred@inaugust.com>
+Date:   Wed Feb 29 14:14:14 2012 -0800
+
+    All the latest OpenStack hotness.
+
+commit 972677fc3dc24a5084657fc337fb2b2981a30e0c
+Author: Jay Pipes <jaypipes@gmail.com>
+Date:   Wed Feb 29 16:42:26 2012 -0500
+
+    Initial checkin for new CLI and client package
+    
+    Copied mostly from python-keystoneclient with
+    some Glance-specific stuff. README.rst shows what
+    WILL be the way to do things, not what is currently coded :)
