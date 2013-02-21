@@ -51,15 +51,21 @@ DISK_FORMATS = ('Acceptable formats: ami, ari, aki, vhd, vmdk, raw, '
            help='Filter images to those with a size less than this.')
 @utils.arg('--property-filter', metavar='<KEY=VALUE>',
            help="Filter images by a user-defined image property.",
-            action='append', dest='properties', default=[])
+           action='append', dest='properties', default=[])
 @utils.arg('--page-size', metavar='<SIZE>', default=None, type=int,
            help='Number of images to request in each paginated request.')
 @utils.arg('--human-readable', action='store_true', default=False,
            help='Print image size in a human-friendly format.')
+@utils.arg('--sort-key', default='name',
+           choices=glanceclient.v1.images.SORT_KEY_VALUES,
+           help='Sort image list by specified field.')
+@utils.arg('--sort-dir', default='asc',
+           choices=glanceclient.v1.images.SORT_DIR_VALUES,
+           help='Sort image list in specified direction.')
 def do_image_list(gc, args):
     """List images you can access."""
     filter_keys = ['name', 'status', 'container_format', 'disk_format',
-               'size_min', 'size_max']
+                   'size_min', 'size_max']
     filter_items = [(key, getattr(args, key)) for key in filter_keys]
     filters = dict([item for item in filter_items if item[1] is not None])
 
@@ -70,9 +76,11 @@ def do_image_list(gc, args):
     kwargs = {'filters': filters}
     if args.page_size is not None:
         kwargs['page_size'] = args.page_size
+
+    kwargs['sort_key'] = args.sort_key
+    kwargs['sort_dir'] = args.sort_dir
+
     images = gc.images.list(**kwargs)
-    columns = ['ID', 'Name', 'Disk Format', 'Container Format',
-               'Size', 'Status']
 
     if args.human_readable:
         def convert_size(image):
@@ -81,6 +89,8 @@ def do_image_list(gc, args):
 
         images = (convert_size(image) for image in images)
 
+    columns = ['ID', 'Name', 'Disk Format', 'Container Format',
+               'Size', 'Status']
     utils.print_list(images, columns)
 
 
@@ -140,6 +150,8 @@ def do_image_download(gc, args):
            help='ID of image to reserve.')
 @utils.arg('--name', metavar='<NAME>',
            help='Name of image.')
+@utils.arg('--store', metavar='<STORE>',
+           help='Store to upload image to.')
 @utils.arg('--disk-format', metavar='<DISK_FORMAT>',
            help='Disk format of image. ' + DISK_FORMATS)
 @utils.arg('--container-format', metavar='<CONTAINER_FORMAT>',
@@ -154,10 +166,9 @@ def do_image_download(gc, args):
 @utils.arg('--min-ram', metavar='<DISK_RAM>',
            help='Minimum amount of ram needed to boot image (in megabytes).')
 @utils.arg('--location', metavar='<IMAGE_URL>',
-           help=('URL where the data for this image already resides.'
-                 ' For example, if the image data is stored in the filesystem'
-                 ' local to the glance server at \'/usr/share/image.tar.gz\','
-                 ' you would specify \'file:///usr/share/image.tar.gz\'.'))
+           help=('URL where the data for this image already resides. For '
+                 'example, if the image data is stored in swift, you could '
+                 'specify \'swift://account:key@example.com/container/obj\'.'))
 @utils.arg('--file', metavar='<FILE>',
            help=('Local file that contains disk image to be uploaded during'
                  ' creation. Alternatively, images can be passed to the client'
@@ -224,10 +235,9 @@ def do_image_create(gc, args):
 @utils.arg('--min-ram', metavar='<DISK_RAM>',
            help='Minimum amount of ram needed to boot image (in megabytes).')
 @utils.arg('--location', metavar='<IMAGE_URL>',
-           help=('URL where the data for this image already resides.'
-                 ' For example, if the image data is stored in the filesystem'
-                 ' local to the glance server at \'/usr/share/image.tar.gz\','
-                 ' you would specify \'file:///usr/share/image.tar.gz\'.'))
+           help=('URL where the data for this image already resides. For '
+                 'example, if the image data is stored in swift, you could '
+                 'specify \'swift://account:key@example.com/container/obj\'.'))
 @utils.arg('--file', metavar='<FILE>',
            help=('Local file that contains disk image to be uploaded during'
                  ' update. Alternatively, images can be passed to the client'

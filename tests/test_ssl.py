@@ -16,8 +16,11 @@
 import os
 import unittest
 
+from OpenSSL import crypto
+
 from glanceclient import exc
 from glanceclient.common import http
+
 
 TEST_VAR_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                             'var'))
@@ -30,12 +33,12 @@ class TestVerifiedHTTPSConnection(unittest.TestCase):
         """
         key_file = os.path.join(TEST_VAR_DIR, 'privatekey.key')
         cert_file = os.path.join(TEST_VAR_DIR, 'certificate.crt')
-        ca_file = os.path.join(TEST_VAR_DIR, 'ca.crt')
+        cacert = os.path.join(TEST_VAR_DIR, 'ca.crt')
         try:
             conn = http.VerifiedHTTPSConnection('127.0.0.1', 0,
                                                 key_file=key_file,
                                                 cert_file=cert_file,
-                                                ca_file=ca_file)
+                                                cacert=cacert)
         except exc.SSLConfigurationError:
             self.fail('Failed to init VerifiedHTTPSConnection.')
 
@@ -44,11 +47,11 @@ class TestVerifiedHTTPSConnection(unittest.TestCase):
         Test VerifiedHTTPSConnection: absense of SSL key file.
         """
         cert_file = os.path.join(TEST_VAR_DIR, 'certificate.crt')
-        ca_file = os.path.join(TEST_VAR_DIR, 'ca.crt')
+        cacert = os.path.join(TEST_VAR_DIR, 'ca.crt')
         try:
             conn = http.VerifiedHTTPSConnection('127.0.0.1', 0,
                                                 cert_file=cert_file,
-                                                ca_file=ca_file)
+                                                cacert=cacert)
             self.fail('Failed to raise assertion.')
         except exc.SSLConfigurationError:
             pass
@@ -58,11 +61,11 @@ class TestVerifiedHTTPSConnection(unittest.TestCase):
         Test VerifiedHTTPSConnection: absense of SSL cert file.
         """
         key_file = os.path.join(TEST_VAR_DIR, 'privatekey.key')
-        ca_file = os.path.join(TEST_VAR_DIR, 'ca.crt')
+        cacert = os.path.join(TEST_VAR_DIR, 'ca.crt')
         try:
             conn = http.VerifiedHTTPSConnection('127.0.0.1', 0,
                                                 key_file=key_file,
-                                                ca_file=ca_file)
+                                                cacert=cacert)
         except:
             self.fail('Failed to init VerifiedHTTPSConnection.')
 
@@ -72,11 +75,11 @@ class TestVerifiedHTTPSConnection(unittest.TestCase):
         """
         key_file = os.path.join(TEST_VAR_DIR, 'badkey.key')
         cert_file = os.path.join(TEST_VAR_DIR, 'certificate.crt')
-        ca_file = os.path.join(TEST_VAR_DIR, 'ca.crt')
+        cacert = os.path.join(TEST_VAR_DIR, 'ca.crt')
         try:
             conn = http.VerifiedHTTPSConnection('127.0.0.1', 0,
                                                 cert_file=cert_file,
-                                                ca_file=ca_file)
+                                                cacert=cacert)
             self.fail('Failed to raise assertion.')
         except exc.SSLConfigurationError:
             pass
@@ -87,11 +90,11 @@ class TestVerifiedHTTPSConnection(unittest.TestCase):
         """
         key_file = os.path.join(TEST_VAR_DIR, 'privatekey.key')
         cert_file = os.path.join(TEST_VAR_DIR, 'badcert.crt')
-        ca_file = os.path.join(TEST_VAR_DIR, 'ca.crt')
+        cacert = os.path.join(TEST_VAR_DIR, 'ca.crt')
         try:
             conn = http.VerifiedHTTPSConnection('127.0.0.1', 0,
                                                 cert_file=cert_file,
-                                                ca_file=ca_file)
+                                                cacert=cacert)
             self.fail('Failed to raise assertion.')
         except exc.SSLConfigurationError:
             pass
@@ -102,11 +105,82 @@ class TestVerifiedHTTPSConnection(unittest.TestCase):
         """
         key_file = os.path.join(TEST_VAR_DIR, 'privatekey.key')
         cert_file = os.path.join(TEST_VAR_DIR, 'certificate.crt')
-        ca_file = os.path.join(TEST_VAR_DIR, 'badca.crt')
+        cacert = os.path.join(TEST_VAR_DIR, 'badca.crt')
         try:
             conn = http.VerifiedHTTPSConnection('127.0.0.1', 0,
                                                 cert_file=cert_file,
-                                                ca_file=ca_file)
+                                                cacert=cacert)
             self.fail('Failed to raise assertion.')
         except exc.SSLConfigurationError:
             pass
+
+    def test_ssl_cert_cname(self):
+        """
+        Test certificate: CN match
+        """
+        cert_file = os.path.join(TEST_VAR_DIR, 'certificate.crt')
+        cert = crypto.load_certificate(crypto.FILETYPE_PEM,
+                                       file(cert_file).read())
+        # The expected cert should have CN=0.0.0.0
+        self.assertEqual(cert.get_subject().commonName, '0.0.0.0')
+        try:
+            conn = http.VerifiedHTTPSConnection('0.0.0.0', 0)
+            conn.verify_callback(None, cert, 0, 0, True)
+        except:
+            self.fail('Unexpected exception.')
+
+    def test_ssl_cert_subject_alt_name(self):
+        """
+        Test certificate: SAN match
+        """
+        cert_file = os.path.join(TEST_VAR_DIR, 'certificate.crt')
+        cert = crypto.load_certificate(crypto.FILETYPE_PEM,
+                                       file(cert_file).read())
+        # The expected cert should have CN=0.0.0.0
+        self.assertEqual(cert.get_subject().commonName, '0.0.0.0')
+        try:
+            conn = http.VerifiedHTTPSConnection('alt1.example.com', 0)
+            conn.verify_callback(None, cert, 0, 0, True)
+        except:
+            self.fail('Unexpected exception.')
+
+        try:
+            conn = http.VerifiedHTTPSConnection('alt2.example.com', 0)
+            conn.verify_callback(None, cert, 0, 0, True)
+        except:
+            self.fail('Unexpected exception.')
+
+    def test_ssl_cert_mismatch(self):
+        """
+        Test certificate: bogus host
+        """
+        cert_file = os.path.join(TEST_VAR_DIR, 'certificate.crt')
+        cert = crypto.load_certificate(crypto.FILETYPE_PEM,
+                                       file(cert_file).read())
+        # The expected cert should have CN=0.0.0.0
+        self.assertEqual(cert.get_subject().commonName, '0.0.0.0')
+        try:
+            conn = http.VerifiedHTTPSConnection('mismatch.example.com', 0)
+        except:
+            self.fail('Failed to init VerifiedHTTPSConnection.')
+
+        self.assertRaises(exc.SSLCertificateError,
+                          conn.verify_callback, None, cert, 0, 0, True)
+
+    def test_ssl_expired_cert(self):
+        """
+        Test certificate: out of date cert
+        """
+        cert_file = os.path.join(TEST_VAR_DIR, 'expired-cert.crt')
+        cert = crypto.load_certificate(crypto.FILETYPE_PEM,
+                                       file(cert_file).read())
+        # The expected expired cert has CN=openstack.example.com
+        self.assertEqual(cert.get_subject().commonName,
+                         'openstack.example.com')
+        try:
+            conn = http.VerifiedHTTPSConnection('openstack.example.com', 0)
+        except:
+            self.fail('Failed to init VerifiedHTTPSConnection.')
+
+        self.assertRaises(exc.SSLCertificateError,
+                          conn.verify_callback, None, cert, 0, 0, True)

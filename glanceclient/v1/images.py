@@ -30,9 +30,13 @@ UPDATE_PARAMS = ('name', 'disk_format', 'container_format', 'min_disk',
                  # compatibility with the legacy client library
                  'deleted')
 
-CREATE_PARAMS = UPDATE_PARAMS + ('id',)
+CREATE_PARAMS = UPDATE_PARAMS + ('id', 'store')
 
 DEFAULT_PAGE_SIZE = 20
+
+SORT_DIR_VALUES = ('asc', 'desc')
+SORT_KEY_VALUES = ('name', 'status', 'container_format', 'disk_format',
+                   'size', 'id', 'created_at', 'updated_at')
 
 
 class Image(base.Resource):
@@ -146,6 +150,22 @@ class ImageManager(base.Manager):
         if 'marker' in kwargs:
             params['marker'] = kwargs['marker']
 
+        sort_key = kwargs.get('sort_key')
+        if sort_key is not None:
+            if sort_key in SORT_KEY_VALUES:
+                params['sort_key'] = sort_key
+            else:
+                raise ValueError('sort_key must be one of the following: %s.'
+                                 % ', '.join(SORT_KEY_VALUES))
+
+        sort_dir = kwargs.get('sort_dir')
+        if sort_dir is not None:
+            if sort_dir in SORT_DIR_VALUES:
+                params['sort_dir'] = sort_dir
+            else:
+                raise ValueError('sort_dir must be one of the following: %s.'
+                                 % ', '.join(SORT_DIR_VALUES))
+
         filters = kwargs.get('filters', {})
         properties = filters.pop('properties', {})
         for key, value in properties.items():
@@ -212,7 +232,7 @@ class ImageManager(base.Manager):
             hdrs['x-glance-api-copy-from'] = copy_from
 
         resp, body_iter = self.api.raw_request(
-                'POST', '/v1/images', headers=hdrs, body=image_data)
+            'POST', '/v1/images', headers=hdrs, body=image_data)
         body = json.loads(''.join([c for c in body_iter]))
         return Image(self, self._format_image_meta_for_user(body['image']))
 
@@ -250,6 +270,6 @@ class ImageManager(base.Manager):
 
         url = '/v1/images/%s' % base.getid(image)
         resp, body_iter = self.api.raw_request(
-                'PUT', url, headers=hdrs, body=image_data)
+            'PUT', url, headers=hdrs, body=image_data)
         body = json.loads(''.join([c for c in body_iter]))
         return Image(self, self._format_image_meta_for_user(body['image']))

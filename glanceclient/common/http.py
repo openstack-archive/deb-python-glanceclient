@@ -54,7 +54,7 @@ class HTTPClient(object):
 
         self.connection_class = self.get_connection_class(self.endpoint_scheme)
         self.connection_kwargs = self.get_connection_kwargs(
-                self.endpoint_scheme, **kwargs)
+            self.endpoint_scheme, **kwargs)
 
         self.auth_token = kwargs.get('token')
 
@@ -74,7 +74,7 @@ class HTTPClient(object):
         _kwargs = {'timeout': float(kwargs.get('timeout', 600))}
 
         if scheme == 'https':
-            _kwargs['ca_file'] = kwargs.get('ca_file', None)
+            _kwargs['cacert'] = kwargs.get('cacert', None)
             _kwargs['cert_file'] = kwargs.get('cert_file', None)
             _kwargs['key_file'] = kwargs.get('key_file', None)
             _kwargs['insecure'] = kwargs.get('insecure', False)
@@ -100,7 +100,7 @@ class HTTPClient(object):
         conn_params_fmt = [
             ('key_file', '--key %s'),
             ('cert_file', '--cert %s'),
-            ('ca_file', '--cacert %s'),
+            ('cacert', '--cacert %s'),
         ]
         for (key, fmt) in conn_params_fmt:
             value = self.connection_kwargs.get(key)
@@ -212,7 +212,7 @@ class HTTPClient(object):
                                      'application/octet-stream')
         if 'body' in kwargs:
             if (hasattr(kwargs['body'], 'read')
-                and method.lower() in ('post', 'put')):
+                    and method.lower() in ('post', 'put')):
                 # We use 'Transfer-Encoding: chunked' because
                 # body size may not always be known in advance.
                 kwargs['headers']['Transfer-Encoding'] = 'chunked'
@@ -243,9 +243,11 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
     """
     Extended HTTPSConnection which uses the OpenSSL library
     for enhanced SSL support.
+    Note: Much of this functionality can eventually be replaced
+          with native Python 3.3 code.
     """
     def __init__(self, host, port, key_file=None, cert_file=None,
-                 ca_file=None, timeout=None, insecure=False,
+                 cacert=None, timeout=None, insecure=False,
                  ssl_compression=True):
         httplib.HTTPSConnection.__init__(self, host, port,
                                          key_file=key_file,
@@ -255,13 +257,51 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
         self.timeout = timeout
         self.insecure = insecure
         self.ssl_compression = ssl_compression
-        self.ca_file = ca_file
+        self.cacert = cacert
         self.setcontext()
 
     @staticmethod
-    def verify_callback(connection, x509, errnum, errdepth, preverify_ok):
-        # Pass through OpenSSL's default result
-        return preverify_ok
+    def host_matches_cert(host, x509):
+        """
+        Verify that the the x509 certificate we have received
+        from 'host' correctly identifies the server we are
+        connecting to, ie that the certificate's Common Name
+        or a Subject Alternative Name matches 'host'.
+        """
+        # First see if we can match the CN
+        if x509.get_subject().commonName == host:
+            return True
+
+        # Also try Subject Alternative Names for a match
+        san_list = None
+        for i in xrange(x509.get_extension_count()):
+            ext = x509.get_extension(i)
+            if ext.get_short_name() == 'subjectAltName':
+                san_list = str(ext)
+                for san in ''.join(san_list.split()).split(','):
+                    if san == "DNS:%s" % host:
+                        return True
+
+        # Server certificate does not match host
+        msg = ('Host "%s" does not match x509 certificate contents: '
+               'CommonName "%s"' % (host, x509.get_subject().commonName))
+        if san_list is not None:
+            msg = msg + ', subjectAltName "%s"' % san_list
+        raise exc.SSLCertificateError(msg)
+
+    def verify_callback(self, connection, x509, errnum,
+                        depth, preverify_ok):
+        if x509.has_expired():
+            msg = "SSL Certificate expired on '%s'" % x509.get_notAfter()
+            raise exc.SSLCertificateError(msg)
+
+        if depth == 0 and preverify_ok is True:
+            # We verify that the host matches against the last
+            # certificate in the chain
+            return self.host_matches_cert(self.host, x509)
+        else:
+            # Pass through OpenSSL's default result
+            return preverify_ok
 
     def setcontext(self):
         """
@@ -301,11 +341,11 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
                 msg = 'Unable to load key from "%s" %s' % (self.key_file, e)
                 raise exc.SSLConfigurationError(msg)
 
-        if self.ca_file:
+        if self.cacert:
             try:
-                self.context.load_verify_locations(self.ca_file)
+                self.context.load_verify_locations(self.cacert)
             except Exception, e:
-                msg = 'Unable to load CA from "%s"' % (self.ca_file, e)
+                msg = 'Unable to load CA from "%s"' % (self.cacert, e)
                 raise exc.SSLConfigurationError(msg)
         else:
             self.context.set_default_verify_paths()
