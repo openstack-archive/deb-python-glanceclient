@@ -23,6 +23,7 @@ Build-Depends-Indep: openstack-pkg-tools,
  python-distribute,
  python-warlock,
  python-nosexcover,
+ python-py (>= 1.4.9),
  python-sphinx
 Standards-Version: 3.9.3
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-glanceclient.git;a=summary
