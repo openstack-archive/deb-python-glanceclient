@@ -22,7 +22,8 @@ Build-Depends-Indep: openstack-pkg-tools,
  python-sphinx,
  python-distribute,
  python-warlock,
- python-nosexcover
+ python-nosexcover,
+ python-sphinx
 Standards-Version: 3.9.3
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-glanceclient.git;a=summary
 Vcs-Git: git://anonscm.debian.org/openstack/python-glanceclient.git
@@ -32,7 +33,7 @@ Package: python-glanceclient
 Architecture: all
 Pre-Depends: dpkg (>= 1.15.6~)
 Depends: python-httplib2,
- python-keystoneclient,
+ python-keystoneclient (>= 1:0.1.2),
  python-prettytable,
  python-openssl,
  python-setuptools,
