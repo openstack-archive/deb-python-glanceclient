@@ -6,6 +6,8 @@ MANIFEST_EXCLUDE_STANDARD := glanceclient
 
 include /usr/share/openstack-pkg-tools/pkgos.make
 
+export OSLO_PACKAGE_VERSION=$(VERSION)
+
 %:
 	dh $@  --with python2
 
