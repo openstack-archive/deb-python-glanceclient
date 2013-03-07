@@ -20,6 +20,7 @@ override_dh_auto_clean:
 	dh_auto_clean
 	rm -f glanceclient/versioninfo
 	rm -f ChangeLog
+	rm -rf setuptools_git-*-py*.egg/
 
 override_dh_install:
 	dh_install
