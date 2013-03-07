@@ -1,2 +1,3 @@
 install-missing-files.patch
 # fix-build-depends.patch
+relaxes-too-strict-pep8-requires.patch
