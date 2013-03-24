@@ -35,6 +35,7 @@ if not hasattr(urlparse, 'parse_qsl'):
 import OpenSSL
 
 from glanceclient import exc
+from glanceclient.common import utils
 
 
 LOG = logging.getLogger(__name__)
@@ -114,7 +115,7 @@ class HTTPClient(object):
             curl.append('-d \'%s\'' % kwargs['body'])
 
         curl.append('%s%s' % (self.endpoint, url))
-        LOG.debug(' '.join(curl))
+        LOG.debug(utils.ensure_str(' '.join(curl)))
 
     @staticmethod
     def log_http_response(resp, body=None):
@@ -124,7 +125,22 @@ class HTTPClient(object):
         dump.append('')
         if body:
             dump.extend([body, ''])
-        LOG.debug('\n'.join(dump))
+        LOG.debug(utils.ensure_str('\n'.join(dump)))
+
+    @staticmethod
+    def encode_headers(headers):
+        """
+        Encodes headers.
+
+        Note: This should be used right before
+        sending anything out.
+
+        :param headers: Headers to encode
+        :returns: Dictionary with encoded headers'
+                  names and values
+        """
+        to_str = utils.ensure_str
+        return dict([(to_str(h), to_str(v)) for h, v in headers.iteritems()])
 
     def _http_request(self, url, method, **kwargs):
         """ Send an http request with the specified characteristics.
@@ -141,8 +157,17 @@ class HTTPClient(object):
         self.log_curl_request(method, url, kwargs)
         conn = self.get_connection()
 
+        # Note(flaper87): Before letting headers / url fly,
+        # they should be encoded otherwise httplib will
+        # complain. If we decide to rely on python-request
+        # this wont be necessary anymore.
+        kwargs['headers'] = self.encode_headers(kwargs['headers'])
+
         try:
             conn_url = posixpath.normpath('%s/%s' % (self.endpoint_path, url))
+            # Note(flaper87): Ditto, headers / url
+            # encoding to make httplib happy.
+            conn_url = utils.ensure_str(conn_url)
             if kwargs['headers'].get('Transfer-Encoding') == 'chunked':
                 conn.putrequest(method, conn_url)
                 for header, value in kwargs['headers'].items():
@@ -177,7 +202,7 @@ class HTTPClient(object):
 
         if 400 <= resp.status < 600:
             LOG.error("Request returned failure status.")
-            raise exc.from_response(resp)
+            raise exc.from_response(resp, body_str)
         elif resp.status in (301, 302, 305):
             # Redirected. Reissue the request to the new location.
             return self._http_request(resp['location'], method, **kwargs)
@@ -246,7 +271,7 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
     Note: Much of this functionality can eventually be replaced
           with native Python 3.3 code.
     """
-    def __init__(self, host, port, key_file=None, cert_file=None,
+    def __init__(self, host, port=None, key_file=None, cert_file=None,
                  cacert=None, timeout=None, insecure=False,
                  ssl_compression=True):
         httplib.HTTPSConnection.__init__(self, host, port,
@@ -317,7 +342,7 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
                                     self.verify_callback)
         else:
             self.context.set_verify(OpenSSL.SSL.VERIFY_NONE,
-                                    self.verify_callback)
+                                    lambda *args: True)
 
         if self.cert_file:
             try:
