@@ -1,4 +1,4 @@
-python-glanceclient (1:0.7.0-1) experimental; urgency=low
+python-glanceclient (1:0.8.0-1) experimental; urgency=low
 
   * New upstream release.
   * Removes debian/patches/fix-ubuntu-tests.patch.
