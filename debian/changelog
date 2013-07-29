@@ -4,6 +4,7 @@ python-glanceclient (1:0.9.0-2) unstable; urgency=high
   * CVE-2013-4111: Fix missing SSL certificate check (Closes: #718282).
   * Cleans correctly so the package can be built twice.
   * Using testrepository instead of run_test.py for running tests.
+  * Standards-Version: is now 3.9.4.
 
  -- Thomas Goirand <zigo@debian.org>  Thu, 30 May 2013 13:55:25 +0800
 
