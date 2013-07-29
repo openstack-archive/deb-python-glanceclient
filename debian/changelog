@@ -5,6 +5,7 @@ python-glanceclient (1:0.9.0-2) unstable; urgency=high
   * Cleans correctly so the package can be built twice.
   * Using testrepository instead of run_test.py for running tests.
   * Standards-Version: is now 3.9.4.
+  * Explicitly using --buildsystem=python_distutils.
 
  -- Thomas Goirand <zigo@debian.org>  Thu, 30 May 2013 13:55:25 +0800
 

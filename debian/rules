@@ -9,22 +9,22 @@ include /usr/share/openstack-pkg-tools/pkgos.make
 export OSLO_PACKAGE_VERSION=$(VERSION)
 
 %:
-	dh $@  --with python2
+	dh $@ --buildsystem=python_distutils --with python2
 
 override_dh_auto_configure:
 	echo $(VERSION) > glanceclient/versioninfo
-	dh_auto_configure
+	dh_auto_configure -O--buildsystem=python_distutils
 
 override_dh_auto_clean:
 	echo $(VERSION) > glanceclient/versioninfo
-	dh_auto_clean
+	dh_auto_clean -O--buildsystem=python_distutils
 	rm -f glanceclient/versioninfo
 	rm -f ChangeLog
 	rm -rf setuptools_git-*-py*.egg/
 	rm -rf .tox python_glanceclient.egg-info
 
 override_dh_install:
-	dh_install
+	dh_install -O--buildsystem=python_distutils
 	rm -rf $(CURDIR)/debian/python-glanceclient/usr/glanceclient
 
 override_dh_auto_test:
