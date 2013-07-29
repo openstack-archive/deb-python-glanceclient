@@ -21,6 +21,7 @@ override_dh_auto_clean:
 	rm -f glanceclient/versioninfo
 	rm -f ChangeLog
 	rm -rf setuptools_git-*-py*.egg/
+	rm -rf .tox python_glanceclient.egg-info
 
 override_dh_install:
 	dh_install
