@@ -25,6 +25,8 @@ else:
 
 from glanceclient import exc
 from glanceclient.common import utils
+from glanceclient.common import progressbar
+from glanceclient.openstack.common import strutils
 import glanceclient.v1.images
 
 #NOTE(bcwaldon): import deprecated cli functions
@@ -65,6 +67,16 @@ DISK_FORMATS = ('Acceptable formats: ami, ari, aki, vhd, vmdk, raw, '
 @utils.arg('--is-public', type=utils.string_to_bool, metavar='{True|False}',
            help=('Allows the user to select a listing of public or non '
                  'public images.'))
+@utils.arg('--owner', default=None, metavar='<TENANT_ID>',
+           help='Display only images owned by this tenant id. Filtering '
+                'occurs on the client side so may be inefficient. This option '
+                'is mainly intended for admin use. Use an empty string (\'\') '
+                'to list images with no owner. Note: This option overrides '
+                'the --is-public argument if present. Note: the v2 API '
+                'supports more efficient server-side owner based filtering.')
+@utils.arg('--all-tenants', action='store_true', default=False,
+           help=('Allows the admin user to list all images '
+                 'irrespective of the image\'s owner or is_public value.'))
 def do_image_list(gc, args):
     """List images you can access."""
     filter_keys = ['name', 'status', 'container_format', 'disk_format',
@@ -82,6 +94,9 @@ def do_image_list(gc, args):
 
     kwargs['sort_key'] = args.sort_key
     kwargs['sort_dir'] = args.sort_dir
+    kwargs['owner'] = args.owner
+    if args.all_tenants is True:
+        kwargs['is_public'] = None
 
     images = gc.images.list(**kwargs)
 
@@ -113,19 +128,26 @@ def _set_data_field(fields, args):
         if args.file:
             fields['data'] = open(args.file, 'rb')
         else:
-            # We distinguish between cases where image data is pipelined:
-            # (1) glance ... < /tmp/file or cat /tmp/file | glance ...
-            # and cases where no image data is provided:
-            # (2) glance ...
-            if (sys.stdin.isatty() is not True):
-                # Our input is from stdin, and we are part of
-                # a pipeline, so data may be present. (We are of
-                # type (1) above.)
+            # distinguish cases where:
+            # (1) stdin is not valid (as in cron jobs):
+            #     glance ... <&-
+            # (2) image data is provided through standard input:
+            #     glance ... < /tmp/file or cat /tmp/file | glance ...
+            # (3) no image data provided:
+            #     glance ...
+            try:
+                os.fstat(0)
+            except OSError:
+                # (1) stdin is not valid (closed...)
+                fields['data'] = None
+                return
+            if not sys.stdin.isatty():
+                # (2) image data is provided through standard input
                 if msvcrt:
                     msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
                 fields['data'] = sys.stdin
             else:
-                # We are of type (2) above, no image data supplied
+                # (3) no image data provided
                 fields['data'] = None
 
 
@@ -144,10 +166,14 @@ def do_image_show(gc, args):
                 'If this is not specified the image data will be '
                 'written to stdout.')
 @utils.arg('image', metavar='<IMAGE>', help='Name or ID of image to download.')
+@utils.arg('--progress', action='store_true', default=False,
+           help='Show download progress bar.')
 def do_image_download(gc, args):
     """Download a specific image."""
     image = utils.find_resource(gc.images, args.image)
     body = image.data()
+    if args.progress:
+        body = progressbar.VerboseIteratorWrapper(body, len(body))
     utils.save_image(body, args.file)
 
 
@@ -198,6 +224,8 @@ def do_image_download(gc, args):
                  "May be used multiple times."))
 @utils.arg('--human-readable', action='store_true', default=False,
            help='Print image size in a human-friendly format.')
+@utils.arg('--progress', action='store_true', default=False,
+           help='Show upload progress bar.')
 def do_image_create(gc, args):
     """Create a new image."""
     # Filter out None values
@@ -219,6 +247,12 @@ def do_image_create(gc, args):
     fields = dict(filter(lambda x: x[0] in CREATE_PARAMS, fields.items()))
 
     _set_data_field(fields, args)
+
+    if args.progress:
+        filesize = utils.get_file_size(fields['data'])
+        fields['data'] = progressbar.VerboseFileWrapper(
+            fields['data'], filesize
+        )
 
     image = gc.images.create(**fields)
     _image_show(image, args.human_readable)
@@ -266,6 +300,8 @@ def do_image_create(gc, args):
                  "those properties not referenced are preserved."))
 @utils.arg('--human-readable', action='store_true', default=False,
            help='Print image size in a human-friendly format.')
+@utils.arg('--progress', action='store_true', default=False,
+           help='Show upload progress bar.')
 def do_image_update(gc, args):
     """Update a specific image."""
     # Filter out None values
@@ -287,7 +323,14 @@ def do_image_update(gc, args):
     UPDATE_PARAMS = glanceclient.v1.images.UPDATE_PARAMS
     fields = dict(filter(lambda x: x[0] in UPDATE_PARAMS, fields.items()))
 
-    _set_data_field(fields, args)
+    if image.status == 'queued':
+        _set_data_field(fields, args)
+
+        if args.progress:
+            filesize = utils.get_file_size(fields['data'])
+            fields['data'] = progressbar.VerboseFileWrapper(
+                fields['data'], filesize
+            )
 
     image = gc.images.update(image, purge_props=args.purge_props, **fields)
     _image_show(image, args.human_readable)
@@ -302,14 +345,14 @@ def do_image_delete(gc, args):
         try:
             if args.verbose:
                 print 'Requesting image delete for %s ...' % \
-                      utils.ensure_str(args_image),
+                      strutils.safe_encode(args_image),
 
             gc.images.delete(image)
 
             if args.verbose:
                 print '[Done]'
 
-        except exc.HTTPException, e:
+        except exc.HTTPException as e:
             if args.verbose:
                 print '[Fail]'
             print '%s: Unable to delete image %s' % (e, args_image)

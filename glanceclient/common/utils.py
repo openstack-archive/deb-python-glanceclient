@@ -14,7 +14,6 @@
 #    under the License.
 
 import errno
-import hashlib
 import os
 import sys
 import uuid
@@ -23,6 +22,7 @@ import prettytable
 
 from glanceclient import exc
 from glanceclient.openstack.common import importutils
+from glanceclient.openstack.common import strutils
 
 
 # Decorator for cli-args
@@ -54,14 +54,14 @@ def print_list(objs, fields, formatters={}):
                 row.append(data)
         pt.add_row(row)
 
-    print ensure_str(pt.get_string())
+    print strutils.safe_encode(pt.get_string())
 
 
 def print_dict(d):
     pt = prettytable.PrettyTable(['Property', 'Value'], caching=False)
     pt.align = 'l'
     [pt.add_row(list(r)) for r in d.iteritems()]
-    print ensure_str(pt.get_string(sortby='Property'))
+    print strutils.safe_encode(pt.get_string(sortby='Property'))
 
 
 def find_resource(manager, name_or_id):
@@ -75,7 +75,7 @@ def find_resource(manager, name_or_id):
 
     # now try to get entity as uuid
     try:
-        uuid.UUID(ensure_str(name_or_id))
+        uuid.UUID(strutils.safe_encode(name_or_id))
         return manager.get(name_or_id)
     except (ValueError, exc.NotFound):
         pass
@@ -137,7 +137,7 @@ def import_versioned_module(version, submodule=None):
 
 def exit(msg=''):
     if msg:
-        print >> sys.stderr, ensure_str(msg)
+        print >> sys.stderr, strutils.safe_encode(msg)
     sys.exit(1)
 
 
@@ -160,23 +160,6 @@ def save_image(data, path):
             image.close()
 
 
-def integrity_iter(iter, checksum):
-    """
-    Check image data integrity.
-
-    :raises: IOError
-    """
-    md5sum = hashlib.md5()
-    for chunk in iter:
-        yield chunk
-        md5sum.update(chunk)
-    md5sum = md5sum.hexdigest()
-    if md5sum != checksum:
-        raise IOError(errno.EPIPE,
-                      'Corrupt image download. Checksum was %s expected %s' %
-                      (md5sum, checksum))
-
-
 def make_size_human_readable(size):
     suffix = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB']
     base = 1024.0
@@ -192,74 +175,52 @@ def make_size_human_readable(size):
     return '%s%s' % (stripped, suffix[index])
 
 
-def ensure_unicode(text, incoming=None, errors='strict'):
+def getsockopt(self, *args, **kwargs):
     """
-    Decodes incoming objects using `incoming` if they're
-    not already unicode.
-
-    :param incoming: Text's current encoding
-    :param errors: Errors handling policy.
-    :returns: text or a unicode `incoming` encoded
-                representation of it.
+    A function which allows us to monkey patch eventlet's
+    GreenSocket, adding a required 'getsockopt' method.
+    TODO: (mclaren) we can remove this once the eventlet fix
+    (https://bitbucket.org/eventlet/eventlet/commits/609f230)
+    lands in mainstream packages.
     """
-    if isinstance(text, unicode):
-        return text
+    return self.fd.getsockopt(*args, **kwargs)
 
-    if not incoming:
-        incoming = sys.stdin.encoding or \
-            sys.getdefaultencoding()
 
-    # Calling `str` in case text is a non str
-    # object.
-    text = str(text)
+def exception_to_str(exc):
     try:
-        return text.decode(incoming, errors)
-    except UnicodeDecodeError:
-        # Note(flaper87) If we get here, it means that
-        # sys.stdin.encoding / sys.getdefaultencoding
-        # didn't return a suitable encoding to decode
-        # text. This happens mostly when global LANG
-        # var is not set correctly and there's no
-        # default encoding. In this case, most likely
-        # python will use ASCII or ANSI encoders as
-        # default encodings but they won't be capable
-        # of decoding non-ASCII characters.
-        #
-        # Also, UTF-8 is being used since it's an ASCII
-        # extension.
-        return text.decode('utf-8', errors)
+        error = unicode(exc)
+    except UnicodeError:
+        try:
+            error = str(exc)
+        except UnicodeError:
+            error = ("Caught '%(exception)s' exception." %
+                     {"exception": exc.__class__.__name__})
+    return strutils.safe_encode(error, errors='ignore')
 
 
-def ensure_str(text, incoming=None,
-               encoding='utf-8', errors='strict'):
+def get_file_size(file_obj):
     """
-    Encodes incoming objects using `encoding`. If
-    incoming is not specified, text is expected to
-    be encoded with current python's default encoding.
-    (`sys.getdefaultencoding`)
+    Analyze file-like object and attempt to determine its size.
 
-    :param incoming: Text's current encoding
-    :param encoding: Expected encoding for text (Default UTF-8)
-    :param errors: Errors handling policy.
-    :returns: text or a bytestring `encoding` encoded
-                representation of it.
+    :param file_obj: file-like object.
+    :retval The file's size or None if it cannot be determined.
     """
-
-    if not incoming:
-        incoming = sys.stdin.encoding or \
-            sys.getdefaultencoding()
-
-    if not isinstance(text, basestring):
-        # try to convert `text` to string
-        # This allows this method for receiving
-        # objs that can be converted to string
-        text = str(text)
-
-    if isinstance(text, unicode):
-        return text.encode(encoding, errors)
-    elif text and encoding != incoming:
-        # Decode text before encoding it with `encoding`
-        text = ensure_unicode(text, incoming, errors)
-        return text.encode(encoding, errors)
-
-    return text
+    if hasattr(file_obj, 'seek') and hasattr(file_obj, 'tell'):
+        try:
+            curr = file_obj.tell()
+            file_obj.seek(0, os.SEEK_END)
+            size = file_obj.tell()
+            file_obj.seek(curr)
+            return size
+        except IOError, e:
+            if e.errno == errno.ESPIPE:
+                # Illegal seek. This means the file object
+                # is a pipe (e.g the user is trying
+                # to pipe image data to the client,
+                # echo testdata | bin/glance add blah...), or
+                # that file object is empty, or that a file-like
+                # object which doesn't support 'seek/tell' has
+                # been supplied.
+                return
+            else:
+                raise

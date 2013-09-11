@@ -15,7 +15,10 @@
 
 import urllib
 
+import warlock
+
 from glanceclient.common import utils
+from glanceclient.openstack.common import strutils
 
 DEFAULT_PAGE_SIZE = 20
 
@@ -52,7 +55,7 @@ class Controller(object):
 
         for param, value in filters.iteritems():
             if isinstance(value, basestring):
-                filters[param] = utils.ensure_str(value)
+                filters[param] = strutils.safe_encode(value)
 
         url = '/v2/images?%s' % urllib.urlencode(filters)
 
@@ -81,13 +84,42 @@ class Controller(object):
         resp, body = self.http_client.raw_request('GET', url)
         checksum = resp.getheader('content-md5', None)
         if do_checksum and checksum is not None:
-            return utils.integrity_iter(body, checksum)
-        else:
-            return body
+            body.set_checksum(checksum)
+        return body
+
+    def upload(self, image_id, image_data):
+        """
+        Upload the data for an image.
+
+        :param image_id: ID of the image to upload data for.
+        :param image_data: File-like object supplying the data to upload.
+        """
+        url = '/v2/images/%s/file' % image_id
+        hdrs = {'Content-Type': 'application/octet-stream'}
+        self.http_client.raw_request('PUT', url,
+                                     headers=hdrs,
+                                     body=image_data)
 
     def delete(self, image_id):
         """Delete an image."""
         self.http_client.json_request('DELETE', 'v2/images/%s' % image_id)
+
+    def create(self, **kwargs):
+        """Create an image."""
+        url = '/v2/images'
+
+        image = self.model()
+        for (key, value) in kwargs.items():
+            try:
+                setattr(image, key, value)
+            except warlock.InvalidOperation, e:
+                raise TypeError(utils.exception_to_str(e))
+
+        resp, body = self.http_client.json_request('POST', url, body=image)
+        #NOTE(esheffield): remove 'self' for now until we have an elegant
+        # way to pass it into the model constructor without conflict
+        body.pop('self', None)
+        return self.model(**body)
 
     def update(self, image_id, **kwargs):
         """

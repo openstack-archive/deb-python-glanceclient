@@ -14,6 +14,8 @@
 #    under the License.
 
 import copy
+import errno
+import hashlib
 import httplib
 import logging
 import posixpath
@@ -36,6 +38,22 @@ import OpenSSL
 
 from glanceclient import exc
 from glanceclient.common import utils
+from glanceclient.openstack.common import strutils
+
+try:
+    from eventlet import patcher
+    # Handle case where we are running in a monkey patched environment
+    if patcher.is_monkey_patched('socket'):
+        from eventlet.green.httplib import HTTPSConnection
+        from eventlet.green.OpenSSL.SSL import GreenConnection as Connection
+        from eventlet.greenio import GreenSocket
+        # TODO(mclaren): A getsockopt workaround: see 'getsockopt' doc string
+        GreenSocket.getsockopt = utils.getsockopt
+    else:
+        raise ImportError
+except ImportError:
+    from httplib import HTTPSConnection
+    from OpenSSL.SSL import Connection as Connection
 
 
 LOG = logging.getLogger(__name__)
@@ -57,7 +75,12 @@ class HTTPClient(object):
         self.connection_kwargs = self.get_connection_kwargs(
             self.endpoint_scheme, **kwargs)
 
+        self.identity_headers = kwargs.get('identity_headers')
         self.auth_token = kwargs.get('token')
+        if self.identity_headers:
+            if self.identity_headers.get('X-Auth-Token'):
+                self.auth_token = self.identity_headers.get('X-Auth-Token')
+                del self.identity_headers['X-Auth-Token']
 
     @staticmethod
     def parse_endpoint(endpoint):
@@ -111,11 +134,11 @@ class HTTPClient(object):
         if self.connection_kwargs.get('insecure'):
             curl.append('-k')
 
-        if 'body' in kwargs:
+        if kwargs.get('body') is not None:
             curl.append('-d \'%s\'' % kwargs['body'])
 
         curl.append('%s%s' % (self.endpoint, url))
-        LOG.debug(utils.ensure_str(' '.join(curl)))
+        LOG.debug(strutils.safe_encode(' '.join(curl)))
 
     @staticmethod
     def log_http_response(resp, body=None):
@@ -125,12 +148,11 @@ class HTTPClient(object):
         dump.append('')
         if body:
             dump.extend([body, ''])
-        LOG.debug(utils.ensure_str('\n'.join(dump)))
+        LOG.debug(strutils.safe_encode('\n'.join(dump)))
 
     @staticmethod
     def encode_headers(headers):
-        """
-        Encodes headers.
+        """Encodes headers.
 
         Note: This should be used right before
         sending anything out.
@@ -139,11 +161,11 @@ class HTTPClient(object):
         :returns: Dictionary with encoded headers'
                   names and values
         """
-        to_str = utils.ensure_str
+        to_str = strutils.safe_encode
         return dict([(to_str(h), to_str(v)) for h, v in headers.iteritems()])
 
     def _http_request(self, url, method, **kwargs):
-        """ Send an http request with the specified characteristics.
+        """Send an http request with the specified characteristics.
 
         Wrapper around httplib.HTTP(S)Connection.request to handle tasks such
         as setting headers and error handling.
@@ -153,6 +175,10 @@ class HTTPClient(object):
         kwargs['headers'].setdefault('User-Agent', USER_AGENT)
         if self.auth_token:
             kwargs['headers'].setdefault('X-Auth-Token', self.auth_token)
+
+        if self.identity_headers:
+            for k, v in self.identity_headers.iteritems():
+                kwargs['headers'].setdefault(k, v)
 
         self.log_curl_request(method, url, kwargs)
         conn = self.get_connection()
@@ -164,10 +190,12 @@ class HTTPClient(object):
         kwargs['headers'] = self.encode_headers(kwargs['headers'])
 
         try:
-            conn_url = posixpath.normpath('%s/%s' % (self.endpoint_path, url))
+            if self.endpoint_path:
+                url = '%s/%s' % (self.endpoint_path, url)
+            conn_url = posixpath.normpath(url)
             # Note(flaper87): Ditto, headers / url
             # encoding to make httplib happy.
-            conn_url = utils.ensure_str(conn_url)
+            conn_url = strutils.safe_encode(conn_url)
             if kwargs['headers'].get('Transfer-Encoding') == 'chunked':
                 conn.putrequest(method, conn_url)
                 for header, value in kwargs['headers'].items():
@@ -256,16 +284,21 @@ class OpenSSLConnectionDelegator(object):
     a delegator must be used.
     """
     def __init__(self, *args, **kwargs):
-        self.connection = OpenSSL.SSL.Connection(*args, **kwargs)
+        self.connection = Connection(*args, **kwargs)
 
     def __getattr__(self, name):
         return getattr(self.connection, name)
 
     def makefile(self, *args, **kwargs):
+        # Making sure socket is closed when this file is closed
+        # since we now avoid closing socket on connection close
+        # see new close method under VerifiedHTTPSConnection
+        kwargs['close'] = True
+
         return socket._fileobject(self.connection, *args, **kwargs)
 
 
-class VerifiedHTTPSConnection(httplib.HTTPSConnection):
+class VerifiedHTTPSConnection(HTTPSConnection):
     """
     Extended HTTPSConnection which uses the OpenSSL library
     for enhanced SSL support.
@@ -275,9 +308,9 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
     def __init__(self, host, port=None, key_file=None, cert_file=None,
                  cacert=None, timeout=None, insecure=False,
                  ssl_compression=True):
-        httplib.HTTPSConnection.__init__(self, host, port,
-                                         key_file=key_file,
-                                         cert_file=cert_file)
+        HTTPSConnection.__init__(self, host, port,
+                                 key_file=key_file,
+                                 cert_file=cert_file)
         self.key_file = key_file
         self.cert_file = cert_file
         self.timeout = timeout
@@ -317,11 +350,13 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
 
     def verify_callback(self, connection, x509, errnum,
                         depth, preverify_ok):
+        # NOTE(leaman): preverify_ok may be a non-boolean type
+        preverify_ok = bool(preverify_ok)
         if x509.has_expired():
             msg = "SSL Certificate expired on '%s'" % x509.get_notAfter()
             raise exc.SSLCertificateError(msg)
 
-        if depth == 0 and preverify_ok is True:
+        if depth == 0 and preverify_ok:
             # We verify that the host matches against the last
             # certificate in the chain
             return self.host_matches_cert(self.host, x509)
@@ -348,14 +383,14 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
         if self.cert_file:
             try:
                 self.context.use_certificate_file(self.cert_file)
-            except Exception, e:
+            except Exception as e:
                 msg = 'Unable to load cert from "%s" %s' % (self.cert_file, e)
                 raise exc.SSLConfigurationError(msg)
             if self.key_file is None:
                 # We support having key and cert in same file
                 try:
                     self.context.use_privatekey_file(self.cert_file)
-                except Exception, e:
+                except Exception as e:
                     msg = ('No key file specified and unable to load key '
                            'from "%s" %s' % (self.cert_file, e))
                     raise exc.SSLConfigurationError(msg)
@@ -363,14 +398,14 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
         if self.key_file:
             try:
                 self.context.use_privatekey_file(self.key_file)
-            except Exception, e:
+            except Exception as e:
                 msg = 'Unable to load key from "%s" %s' % (self.key_file, e)
                 raise exc.SSLConfigurationError(msg)
 
         if self.cacert:
             try:
                 self.context.load_verify_locations(self.cacert)
-            except Exception, e:
+            except Exception as e:
                 msg = 'Unable to load CA from "%s"' % (self.cacert, e)
                 raise exc.SSLConfigurationError(msg)
         else:
@@ -385,23 +420,72 @@ class VerifiedHTTPSConnection(httplib.HTTPSConnection):
         if self.timeout is not None:
             # '0' microseconds
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVTIMEO,
-                            struct.pack('LL', self.timeout, 0))
+                            struct.pack('fL', self.timeout, 0))
         self.sock = OpenSSLConnectionDelegator(self.context, sock)
         self.sock.connect((self.host, self.port))
 
+    def close(self):
+        if self.sock:
+            # Removing reference to socket but don't close it yet.
+            # Response close will close both socket and associated
+            # file. Closing socket too soon will cause response
+            # reads to fail with socket IO error 'Bad file descriptor'.
+            self.sock = None
+
+        # Calling close on HTTPConnection to continue doing that cleanup.
+        HTTPSConnection.close(self)
+
 
 class ResponseBodyIterator(object):
-    """A class that acts as an iterator over an HTTP response."""
+    """
+    A class that acts as an iterator over an HTTP response.
+
+    This class will also check response body integrity when iterating over
+    the instance and if a checksum was supplied using `set_checksum` method,
+    else by default the class will not do any integrity check.
+    """
 
     def __init__(self, resp):
-        self.resp = resp
+        self._resp = resp
+        self._checksum = None
+        self._size = int(resp.getheader('content-length', 0))
+        self._end_reached = False
+
+    def set_checksum(self, checksum):
+        """
+        Set checksum to check against when iterating over this instance.
+
+        :raise: AttributeError if iterator is already consumed.
+        """
+        if self._end_reached:
+            raise AttributeError("Can't set checksum for an already consumed"
+                                 " iterator")
+        self._checksum = checksum
+
+    def __len__(self):
+        return int(self._size)
 
     def __iter__(self):
+        md5sum = hashlib.md5()
         while True:
-            yield self.next()
+            try:
+                chunk = self.next()
+            except StopIteration:
+                self._end_reached = True
+                # NOTE(mouad): Check image integrity when the end of response
+                # body is reached.
+                md5sum = md5sum.hexdigest()
+                if self._checksum is not None and md5sum != self._checksum:
+                    raise IOError(errno.EPIPE,
+                                  'Corrupted image. Checksum was %s '
+                                  'expected %s' % (md5sum, self._checksum))
+                raise
+            else:
+                yield chunk
+                md5sum.update(chunk)
 
     def next(self):
-        chunk = self.resp.read(CHUNKSIZE)
+        chunk = self._resp.read(CHUNKSIZE)
         if chunk:
             return chunk
         else:

@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2011 OpenStack LLC.
+# Copyright 2011 OpenStack Foundation.
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -24,7 +24,7 @@ import traceback
 
 
 def import_class(import_str):
-    """Returns a class from a string including module and class"""
+    """Returns a class from a string including module and class."""
     mod_str, _sep, class_str = import_str.rpartition('.')
     try:
         __import__(mod_str)

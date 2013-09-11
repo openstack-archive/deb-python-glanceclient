@@ -16,12 +16,14 @@
 import errno
 import json
 import StringIO
+import sys
 import testtools
 import urlparse
 
-import glanceclient.v1.client as client
-import glanceclient.v1.images
-import glanceclient.v1.shell as shell
+from glanceclient.v1 import client
+from glanceclient.v1 import images
+from glanceclient.v1 import legacy_shell
+from glanceclient.v1 import shell
 from tests import utils
 
 
@@ -66,6 +68,96 @@ fixtures = {
             ]},
         ),
     },
+    '/v1/images/detail?is_public=None&limit=20': {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': 'a',
+                    'owner': 'A',
+                    'is_public': 'True',
+                    'name': 'image-1',
+                    'properties': {'arch': 'x86_64'},
+                },
+                {
+                    'id': 'b',
+                    'owner': 'B',
+                    'is_public': 'False',
+                    'name': 'image-2',
+                    'properties': {'arch': 'x86_64'},
+                },
+                {
+                    'id': 'c',
+                    'is_public': 'False',
+                    'name': 'image-3',
+                    'properties': {'arch': 'x86_64'},
+                },
+            ]},
+        ),
+    },
+    '/v1/images/detail?is_public=None&limit=5': {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': 'a',
+                    'owner': 'A',
+                    'name': 'image-1',
+                    'properties': {'arch': 'x86_64'},
+                },
+                {
+                    'id': 'b',
+                    'owner': 'B',
+                    'name': 'image-2',
+                    'properties': {'arch': 'x86_64'},
+                },
+                {
+                    'id': 'b2',
+                    'owner': 'B',
+                    'name': 'image-3',
+                    'properties': {'arch': 'x86_64'},
+                },
+                {
+                    'id': 'c',
+                    'name': 'image-3',
+                    'properties': {'arch': 'x86_64'},
+                },
+            ]},
+        ),
+    },
+    '/v1/images/detail?limit=5': {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': 'a',
+                    'owner': 'A',
+                    'is_public': 'False',
+                    'name': 'image-1',
+                    'properties': {'arch': 'x86_64'},
+                },
+                {
+                    'id': 'b',
+                    'owner': 'A',
+                    'is_public': 'False',
+                    'name': 'image-2',
+                    'properties': {'arch': 'x86_64'},
+                },
+                {
+                    'id': 'b2',
+                    'owner': 'B',
+                    'name': 'image-3',
+                    'properties': {'arch': 'x86_64'},
+                },
+                {
+                    'id': 'c',
+                    'is_public': 'True',
+                    'name': 'image-3',
+                    'properties': {'arch': 'x86_64'},
+                },
+            ]},
+        ),
+    },
     '/v1/images/detail?marker=a&limit=20': {
         'GET': (
             {},
@@ -78,6 +170,30 @@ fixtures = {
                 {
                     'id': 'c',
                     'name': 'image-2',
+                    'properties': {'arch': 'x86_64'},
+                },
+            ]},
+        ),
+    },
+    '/v1/images/detail?limit=1': {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': 'a',
+                    'name': 'image-0',
+                    'properties': {'arch': 'x86_64'},
+                },
+            ]},
+        ),
+    },
+    '/v1/images/detail?marker=a&limit=1': {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': 'b',
+                    'name': 'image-1',
                     'properties': {'arch': 'x86_64'},
                 },
             ]},
@@ -129,7 +245,8 @@ fixtures = {
             ]},
         ),
     },
-    '/v1/images/detail?property-ping=pong&limit=20': {
+    '/v1/images/detail?property-ping=pong&limit=20':
+    {
         'GET': (
             {},
             {'images': [
@@ -228,7 +345,8 @@ fixtures = {
     '/v1/images/3': {
         'HEAD': (
             {
-                'x-image-meta-id': '3'
+                'x-image-meta-id': '3',
+                'x-image-meta-name': "ni\xc3\xb1o"
             },
             None,
         ),
@@ -247,7 +365,7 @@ class ImageManagerTest(testtools.TestCase):
     def setUp(self):
         super(ImageManagerTest, self).setUp()
         self.api = utils.FakeAPI(fixtures)
-        self.mgr = glanceclient.v1.images.ImageManager(self.api)
+        self.mgr = images.ImageManager(self.api)
 
     def test_paginated_list(self):
         images = list(self.mgr.list(page_size=2))
@@ -268,18 +386,26 @@ class ImageManagerTest(testtools.TestCase):
         self.assertEqual(self.api.calls, expect)
 
     def test_list_with_limit_greater_than_page_size(self):
-        list(self.mgr.list(page_size=20, limit=30))
-        expect = [('GET', '/v1/images/detail?limit=20', {}, None)]
+        images = list(self.mgr.list(page_size=1, limit=2))
+        expect = [
+            ('GET', '/v1/images/detail?limit=1', {}, None),
+            ('GET', '/v1/images/detail?marker=a&limit=1', {}, None),
+        ]
+        self.assertEqual(len(images), 2)
+        self.assertEqual(images[0].id, 'a')
+        self.assertEqual(images[1].id, 'b')
         self.assertEqual(self.api.calls, expect)
 
     def test_list_with_marker(self):
         list(self.mgr.list(marker='a'))
-        expect = [('GET', '/v1/images/detail?marker=a&limit=20', {}, None)]
+        url = '/v1/images/detail?marker=a&limit=20'
+        expect = [('GET', url, {}, None)]
         self.assertEqual(self.api.calls, expect)
 
     def test_list_with_filter(self):
         list(self.mgr.list(filters={'name': "foo"}))
-        expect = [('GET', '/v1/images/detail?limit=20&name=foo', {}, None)]
+        url = '/v1/images/detail?limit=20&name=foo'
+        expect = [('GET', url, {}, None)]
         self.assertEqual(self.api.calls, expect)
 
     def test_list_with_property_filters(self):
@@ -309,6 +435,12 @@ class ImageManagerTest(testtools.TestCase):
         self.assertEqual(image.is_public, False)
         self.assertEqual(image.protected, False)
         self.assertEqual(image.deleted, False)
+        self.assertEqual(image.properties, {u'arch': u'x86_64'})
+
+    def test_get_encoding(self):
+        image = self.mgr.get('3')
+        expect = [('HEAD', '/v1/images/3', {}, None)]
+        self.assertEqual(image.name, u"ni\xf1o")
 
     def test_data(self):
         data = ''.join([b for b in self.mgr.data('1', do_checksum=False)])
@@ -333,7 +465,7 @@ class ImageManagerTest(testtools.TestCase):
         try:
             data = ''.join([b for b in data])
             self.fail('data did not raise an error.')
-        except IOError, e:
+        except IOError as e:
             self.assertEqual(errno.EPIPE, e.errno)
             msg = 'was fd7c5c4fdaa97163ee4ba8842baa537a expected wrong'
             self.assertTrue(msg in str(e))
@@ -451,12 +583,68 @@ class ImageManagerTest(testtools.TestCase):
         expect = [('PUT', '/v1/images/1', expect_headers, None)]
         self.assertEqual(self.api.calls, expect)
 
+    def test_image_meta_from_headers_encoding(self):
+        fields = {"x-image-meta-name": "ni\xc3\xb1o"}
+        headers = self.mgr._image_meta_from_headers(fields)
+        self.assertEqual(headers["name"], u"ni\xf1o")
+
+    def test_image_list_with_owner(self):
+        images = self.mgr.list(owner='A', page_size=20)
+        image_list = list(images)
+        self.assertEqual(image_list[0].owner, 'A')
+        self.assertEqual(image_list[0].id, 'a')
+        self.assertEqual(len(image_list), 1)
+
+    def test_image_list_with_notfound_owner(self):
+        images = self.mgr.list(owner='X', page_size=20)
+        self.assertEqual(len(list(images)), 0)
+
+    def test_image_list_with_empty_string_owner(self):
+        images = self.mgr.list(owner='', page_size=20)
+        image_list = list(images)
+        self.assertRaises(AttributeError, lambda: image_list[0].owner)
+        self.assertEqual(image_list[0].id, 'c')
+        self.assertEqual(len(image_list), 1)
+
+    def test_image_list_with_unspecified_owner(self):
+        images = self.mgr.list(owner=None, page_size=5)
+        image_list = list(images)
+        self.assertEqual(image_list[0].owner, 'A')
+        self.assertEqual(image_list[0].id, 'a')
+        self.assertEqual(image_list[1].owner, 'A')
+        self.assertEqual(image_list[1].id, 'b')
+        self.assertEqual(image_list[2].owner, 'B')
+        self.assertEqual(image_list[2].id, 'b2')
+        self.assertRaises(AttributeError, lambda: image_list[3].owner)
+        self.assertEqual(image_list[3].id, 'c')
+        self.assertEqual(len(image_list), 4)
+
+    def test_image_list_with_owner_and_limit(self):
+        images = self.mgr.list(owner='B', page_size=5, limit=1)
+        image_list = list(images)
+        self.assertEqual(image_list[0].owner, 'B')
+        self.assertEqual(image_list[0].id, 'b')
+        self.assertEqual(len(image_list), 1)
+
+    def test_image_list_all_tenants(self):
+        images = self.mgr.list(is_public=None, page_size=5)
+        image_list = list(images)
+        self.assertEqual(image_list[0].owner, 'A')
+        self.assertEqual(image_list[0].id, 'a')
+        self.assertEqual(image_list[1].owner, 'B')
+        self.assertEqual(image_list[1].id, 'b')
+        self.assertEqual(image_list[2].owner, 'B')
+        self.assertEqual(image_list[2].id, 'b2')
+        self.assertRaises(AttributeError, lambda: image_list[3].owner)
+        self.assertEqual(image_list[3].id, 'c')
+        self.assertEqual(len(image_list), 4)
+
 
 class ImageTest(testtools.TestCase):
     def setUp(self):
         super(ImageTest, self).setUp()
         self.api = utils.FakeAPI(fixtures)
-        self.mgr = glanceclient.v1.images.ImageManager(self.api)
+        self.mgr = images.ImageManager(self.api)
 
     def test_delete(self):
         image = self.mgr.get('1')
@@ -507,7 +695,7 @@ class ImageTest(testtools.TestCase):
         try:
             data = ''.join([b for b in image.data()])
             self.fail('data did not raise an error.')
-        except IOError, e:
+        except IOError as e:
             self.assertEqual(errno.EPIPE, e.errno)
             msg = 'was fd7c5c4fdaa97163ee4ba8842baa537a expected wrong'
             self.assertTrue(msg in str(e))
@@ -550,6 +738,7 @@ class ParameterFakeAPI(utils.FakeAPI):
 class FakeArg(object):
     def __init__(self, arg_dict):
         self.arg_dict = arg_dict
+        self.fields = arg_dict.keys()
 
     def __getattr__(self, name):
         if name in self.arg_dict:
@@ -564,7 +753,7 @@ class UrlParameterTest(testtools.TestCase):
         super(UrlParameterTest, self).setUp()
         self.api = ParameterFakeAPI({})
         self.gc = client.Client("http://fakeaddress.com")
-        self.gc.images = glanceclient.v1.images.ImageManager(self.api)
+        self.gc.images = images.ImageManager(self.api)
 
     def test_is_public_list(self):
         shell.do_image_list(self.gc, FakeArg({"is_public": "True"}))
@@ -572,3 +761,20 @@ class UrlParameterTest(testtools.TestCase):
         qs_dict = urlparse.parse_qs(parts.query)
         self.assertTrue('is_public' in qs_dict)
         self.assertTrue(qs_dict['is_public'][0].lower() == "true")
+
+    def test_copy_from_used(self):
+        class LegacyFakeArg(object):
+            def __init__(self, fields):
+                self.fields = fields
+                self.dry_run = False
+                self.verbose = False
+
+        def images_create(**kwargs):
+            class FakeImage():
+                id = "ThisiSanID"
+            self.assertNotEqual(kwargs['data'], sys.stdin)
+            return FakeImage()
+
+        self.gc.images.create = images_create
+        args = LegacyFakeArg(["copy_from=http://somehost.com/notreal.qcow"])
+        legacy_shell.do_add(self.gc, args)

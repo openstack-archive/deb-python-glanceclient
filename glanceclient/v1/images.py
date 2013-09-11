@@ -14,13 +14,12 @@
 #    under the License.
 
 import copy
-import errno
 import json
-import os
 import urllib
 
 from glanceclient.common import base
 from glanceclient.common import utils
+from glanceclient.openstack.common import strutils
 
 UPDATE_PARAMS = ('name', 'disk_format', 'container_format', 'min_disk',
                  'min_ram', 'owner', 'size', 'is_public', 'protected',
@@ -58,12 +57,14 @@ class ImageManager(base.Manager):
 
     def _image_meta_from_headers(self, headers):
         meta = {'properties': {}}
+        safe_decode = strutils.safe_decode
         for key, value in headers.iteritems():
+            value = safe_decode(value, incoming='utf-8')
             if key.startswith('x-image-meta-property-'):
-                _key = key[22:]
+                _key = safe_decode(key[22:], incoming='utf-8')
                 meta['properties'][_key] = value
             elif key.startswith('x-image-meta-'):
-                _key = key[13:]
+                _key = safe_decode(key[13:], incoming='utf-8')
                 meta[_key] = value
 
         for key in ['is_public', 'protected', 'deleted']:
@@ -75,11 +76,20 @@ class ImageManager(base.Manager):
     def _image_meta_to_headers(self, fields):
         headers = {}
         fields_copy = copy.deepcopy(fields)
-        ensure_unicode = utils.ensure_unicode
+
+        # NOTE(flaper87): Convert to str, headers
+        # that are not instance of basestring. All
+        # headers will be encoded later, before the
+        # request is sent.
+        def to_str(value):
+            if not isinstance(value, basestring):
+                return str(value)
+            return value
+
         for key, value in fields_copy.pop('properties', {}).iteritems():
-            headers['x-image-meta-property-%s' % key] = ensure_unicode(value)
+            headers['x-image-meta-property-%s' % key] = to_str(value)
         for key, value in fields_copy.iteritems():
-            headers['x-image-meta-%s' % key] = ensure_unicode(value)
+            headers['x-image-meta-%s' % key] = to_str(value)
         return headers
 
     @staticmethod
@@ -117,9 +127,8 @@ class ImageManager(base.Manager):
                                           % urllib.quote(image_id))
         checksum = resp.getheader('x-image-meta-checksum', None)
         if do_checksum and checksum is not None:
-            return utils.integrity_iter(body, checksum)
-        else:
-            return body
+            body.set_checksum(checksum)
+        return body
 
     def list(self, **kwargs):
         """Get a list of images.
@@ -130,24 +139,42 @@ class ImageManager(base.Manager):
                        list than that represented by this image id
         :param filters: dict of direct comparison filters that mimics the
                         structure of an image object
+        :param owner: If provided, only images with this owner (tenant id)
+                      will be listed. An empty string ('') matches ownerless
+                      images.
         :rtype: list of :class:`Image`
         """
         absolute_limit = kwargs.get('limit')
 
         def paginate(qp, seen=0):
-            # Note(flaper87) Url encoding should
-            # be moved inside http utils, at least
-            # shouldn't be here.
-            #
-            # Making sure all params are str before
-            # trying to encode them
+            def filter_owner(owner, image):
+                # If client side owner 'filter' is specified
+                # only return images that match 'owner'.
+                if owner is None:
+                    # Do not filter based on owner
+                    return False
+                if (not hasattr(image, 'owner')) or image.owner is None:
+                    # ownerless image
+                    return not (owner == '')
+                else:
+                    return not (image.owner == owner)
+
+            owner = qp.pop('owner', None)
             for param, value in qp.iteritems():
                 if isinstance(value, basestring):
-                    qp[param] = utils.ensure_str(value)
+                    # Note(flaper87) Url encoding should
+                    # be moved inside http utils, at least
+                    # shouldn't be here.
+                    #
+                    # Making sure all params are str before
+                    # trying to encode them
+                    qp[param] = strutils.safe_encode(value)
 
             url = '/v1/images/detail?%s' % urllib.urlencode(qp)
             images = self._list(url, "images")
             for image in images:
+                if filter_owner(owner, image):
+                    continue
                 seen += 1
                 if absolute_limit is not None and seen > absolute_limit:
                     return
@@ -186,41 +213,17 @@ class ImageManager(base.Manager):
         for key, value in properties.items():
             params['property-%s' % key] = value
         params.update(filters)
+        if kwargs.get('owner') is not None:
+            params['owner'] = kwargs['owner']
+            params['is_public'] = None
+        if 'is_public' in kwargs:
+            params['is_public'] = kwargs['is_public']
 
         return paginate(params)
 
     def delete(self, image):
         """Delete an image."""
         self._delete("/v1/images/%s" % base.getid(image))
-
-    def _get_file_size(self, obj):
-        """Analyze file-like object and attempt to determine its size.
-
-        :param obj: file-like object, typically redirected from stdin.
-        :retval The file's size or None if it cannot be determined.
-        """
-        # For large images, we need to supply the size of the
-        # image file. See LP Bugs #827660 and #845788.
-        if hasattr(obj, 'seek') and hasattr(obj, 'tell'):
-            try:
-                obj.seek(0, os.SEEK_END)
-                obj_size = obj.tell()
-                obj.seek(0)
-                return obj_size
-            except IOError, e:
-                if e.errno == errno.ESPIPE:
-                    # Illegal seek. This means the user is trying
-                    # to pipe image data to the client, e.g.
-                    # echo testdata | bin/glance add blah..., or
-                    # that stdin is empty, or that a file-like
-                    # object which doesn't support 'seek/tell' has
-                    # been supplied.
-                    return None
-                else:
-                    raise
-        else:
-            # Cannot determine size of input image
-            return None
 
     def create(self, **kwargs):
         """Create an image
@@ -229,7 +232,7 @@ class ImageManager(base.Manager):
         """
         image_data = kwargs.pop('data', None)
         if image_data is not None:
-            image_size = self._get_file_size(image_data)
+            image_size = utils.get_file_size(image_data)
             if image_size is not None:
                 kwargs.setdefault('size', image_size)
 
@@ -258,7 +261,7 @@ class ImageManager(base.Manager):
         """
         image_data = kwargs.pop('data', None)
         if image_data is not None:
-            image_size = self._get_file_size(image_data)
+            image_size = utils.get_file_size(image_data)
             if image_size is not None:
                 kwargs.setdefault('size', image_size)
 

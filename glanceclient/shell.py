@@ -27,6 +27,7 @@ from keystoneclient.v2_0 import client as ksclient
 import glanceclient
 from glanceclient import exc
 from glanceclient.common import utils
+from glanceclient.openstack.common import strutils
 
 
 class OpenStackImagesShell(object):
@@ -295,7 +296,7 @@ class OpenStackImagesShell(object):
     # Compatibility check to remove API version as the trailing component
     # in a service endpoint; also removes a trailing '/'
     def _strip_version(self, endpoint):
-        """Strip a version from the last component of an endpoint if present"""
+        """Strip version from the last component of endpoint if present."""
 
         # Get rid of trailing '/' if present
         if endpoint.endswith('/'):
@@ -466,10 +467,10 @@ class HelpFormatter(argparse.HelpFormatter):
 
 def main():
     try:
-        OpenStackImagesShell().main(map(utils.ensure_unicode, sys.argv[1:]))
+        OpenStackImagesShell().main(map(strutils.safe_decode, sys.argv[1:]))
     except KeyboardInterrupt:
         print >> sys.stderr, '... terminating glance client'
         sys.exit(1)
-    except Exception, e:
-        print >> sys.stderr, e
+    except Exception as e:
+        print >> sys.stderr, utils.exception_to_str(e)
         sys.exit(1)
