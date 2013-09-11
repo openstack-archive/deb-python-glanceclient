@@ -1,3 +1,2 @@
 install-missing-files.patch
 # fix-build-depends.patch
-CVE-2013-4111_Fix_SSL_certificate_CNAME_checking.patch

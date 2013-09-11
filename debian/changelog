@@ -1,6 +1,7 @@
 python-glanceclient (1:0.10.0-1) unstable; urgency=low
 
   * New upstream release.
+  * Removed now applied upstream CVE-2013-4111 patch.
 
  -- Thomas Goirand <zigo@debian.org>  Wed, 11 Sep 2013 13:18:30 +0800
 
