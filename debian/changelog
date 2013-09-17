@@ -1,6 +1,6 @@
 python-glanceclient (1:0.10.0-2) unstable; urgency=low
 
-  * (Build-)depends on python-warlock >= 1.0.1.
+  * (Build-)depends on python-warlock >= 1.0.1 and python-d2to1 >= 0.2.11.
 
  -- Thomas Goirand <zigo@debian.org>  Tue, 17 Sep 2013 18:55:26 +0800
 
