@@ -1,6 +1,6 @@
 python-glanceclient (1:0.10.0-2) unstable; urgency=low
 
-  * (Build-)depends on python-warlock >= 1.0.1 and python-d2to1 >= 0.2.11.
+  * (Build-)depends on python-warlock >= 1.0.1 and python-d2to1 >= 0.2.10.
   * Updated version of (build-)depends of keystoneclient to >= 1:0.2.0.
   * Fixed min versions of testtools and testrepository build-depends.
 
