@@ -34,7 +34,8 @@ Build-Depends-Indep: pep8 (>= 1.3.3),
                      python-tox,
                      python-unittest2,
                      python-warlock (>= 1.0.1),
-                     testrepository (>= 0.0.13)
+                     testrepository (>= 0.0.13),
+                     subunit
 Standards-Version: 3.9.4
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-glanceclient.git;a=summary
 Vcs-Git: git://anonscm.debian.org/openstack/python-glanceclient.git
