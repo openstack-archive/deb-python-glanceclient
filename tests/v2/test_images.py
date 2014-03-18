@@ -24,6 +24,9 @@ from tests import utils
 _CHKSUM = '93264c3edf5972c9f1cb309543d38a5c'
 _CHKSUM1 = '54264c3edf5972c9f1cb309453d38a46'
 
+_TAG1 = 'power'
+_TAG2 = '64bit'
+
 _BOGUS_ID = '63e7f218-29de-4477-abdc-8db7c9533188'
 _EVERYTHING_ID = '802cbbb7-0379-4c38-853f-37302b5e3d29'
 _OWNED_IMAGE_ID = 'a4963502-acc7-42ba-ad60-5aa0962b7faf'
@@ -81,6 +84,21 @@ fixtures = {
             {
                 'id': '3a4560a1-e585-443e-9b39-553b46ec92d1',
                 'name': 'image-1',
+            },
+        ),
+        'PATCH': (
+            {},
+            '',
+        ),
+    },
+    '/v2/images/e7e59ff6-fa2e-4075-87d3-1a1398a07dc3': {
+        'GET': (
+            {},
+            {
+                'id': 'e7e59ff6-fa2e-4075-87d3-1a1398a07dc3',
+                'name': 'image-3',
+                'barney': 'rubble',
+                'george': 'jetson',
             },
         ),
         'PATCH': (
@@ -239,10 +257,59 @@ fixtures = {
             {'images': []},
         ),
     },
+    '/v2/images?limit=%d&tag=%s' % (images.DEFAULT_PAGE_SIZE, _TAG1): {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': '3a4560a1-e585-443e-9b39-553b46ec92d1',
+                    'name': 'image-1',
+                }
+            ]},
+        ),
+    },
+    '/v2/images?limit=%d&tag=%s' % (images.DEFAULT_PAGE_SIZE, _TAG2): {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': '2a4560b2-e585-443e-9b39-553b46ec92d1',
+                    'name': 'image-1',
+                },
+                {
+                    'id': '6f99bf80-2ee6-47cf-acfe-1f1fabb7e810',
+                    'name': 'image-2',
+                },
+            ]},
+        ),
+    },
+    '/v2/images?limit=%d&tag=%s&tag=%s' % (images.DEFAULT_PAGE_SIZE,
+                                           _TAG1, _TAG2):
+    {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': '2a4560b2-e585-443e-9b39-553b46ec92d1',
+                    'name': 'image-1',
+                }
+            ]},
+        ),
+    },
+    '/v2/images?limit=%d&tag=fake' % images.DEFAULT_PAGE_SIZE: {
+        'GET': (
+            {},
+            {'images': []},
+        ),
+    },
 }
 
 
-fake_schema = {'name': 'image', 'properties': {'id': {}, 'name': {}}}
+fake_schema = {
+    'name': 'image',
+    'properties': {'id': {}, 'name': {}},
+    'additionalProperties': {'type': 'string'}
+}
 FakeModel = warlock.model_factory(fake_schema)
 
 
@@ -297,7 +364,7 @@ class TestController(testtools.TestCase):
         fake_id = '3a4560a1-e585-443e-9b39-553b46ec92d1'
         filters = {'filters': dict([('checksum', _CHKSUM)])}
         images = list(self.controller.list(**filters))
-        self.assertEquals(1, len(images))
+        self.assertEqual(1, len(images))
         self.assertEqual(images[0].id, '%s' % fake_id)
 
     def test_list_images_for_checksum_multiple_images(self):
@@ -305,14 +372,14 @@ class TestController(testtools.TestCase):
         fake_id2 = '6f99bf80-2ee6-47cf-acfe-1f1fabb7e810'
         filters = {'filters': dict([('checksum', _CHKSUM1)])}
         images = list(self.controller.list(**filters))
-        self.assertEquals(2, len(images))
+        self.assertEqual(2, len(images))
         self.assertEqual(images[0].id, '%s' % fake_id1)
         self.assertEqual(images[1].id, '%s' % fake_id2)
 
     def test_list_images_for_wrong_checksum(self):
         filters = {'filters': dict([('checksum', 'wrong')])}
         images = list(self.controller.list(**filters))
-        self.assertEquals(0, len(images))
+        self.assertEqual(0, len(images))
 
     def test_list_images_for_bogus_owner(self):
         filters = {'filters': dict([('owner', _BOGUS_ID)])}
@@ -339,6 +406,35 @@ class TestController(testtools.TestCase):
 
         self.assertEqual(filters["owner"], "ni\xc3\xb1o")
 
+    def test_list_images_for_tag_single_image(self):
+        img_id = '3a4560a1-e585-443e-9b39-553b46ec92d1'
+        filters = {'filters': dict([('tag', [_TAG1])])}
+        images = list(self.controller.list(**filters))
+        self.assertEqual(1, len(images))
+        self.assertEqual(images[0].id, '%s' % img_id)
+        pass
+
+    def test_list_images_for_tag_multiple_images(self):
+        img_id1 = '2a4560b2-e585-443e-9b39-553b46ec92d1'
+        img_id2 = '6f99bf80-2ee6-47cf-acfe-1f1fabb7e810'
+        filters = {'filters': dict([('tag', [_TAG2])])}
+        images = list(self.controller.list(**filters))
+        self.assertEqual(2, len(images))
+        self.assertEqual(images[0].id, '%s' % img_id1)
+        self.assertEqual(images[1].id, '%s' % img_id2)
+
+    def test_list_images_for_multi_tags(self):
+        img_id1 = '2a4560b2-e585-443e-9b39-553b46ec92d1'
+        filters = {'filters': dict([('tag', [_TAG1, _TAG2])])}
+        images = list(self.controller.list(**filters))
+        self.assertEqual(1, len(images))
+        self.assertEqual(images[0].id, '%s' % img_id1)
+
+    def test_list_images_for_non_existent_tag(self):
+        filters = {'filters': dict([('tag', ['fake'])])}
+        images = list(self.controller.list(**filters))
+        self.assertEqual(0, len(images))
+
     def test_get_image(self):
         image = self.controller.get('3a4560a1-e585-443e-9b39-553b46ec92d1')
         self.assertEqual(image.id, '3a4560a1-e585-443e-9b39-553b46ec92d1')
@@ -351,6 +447,14 @@ class TestController(testtools.TestCase):
         image = self.controller.create(**properties)
         self.assertEqual(image.id, '3a4560a1-e585-443e-9b39-553b46ec92d1')
         self.assertEqual(image.name, 'image-1')
+
+    def test_create_bad_additionalProperty_type(self):
+        properties = {
+            'name': 'image-1',
+            'bad_prop': True,
+        }
+        with testtools.ExpectedException(TypeError):
+            self.controller.create(**properties)
 
     def test_delete_image(self):
         self.controller.delete('87b634c1-f893-33c9-28a9-e5673c99239a')
@@ -405,12 +509,12 @@ class TestController(testtools.TestCase):
         body = ''.join([b for b in body])
         self.assertEqual(body, 'CCC')
 
-    def test_update_without_data(self):
+    def test_update_replace_prop(self):
         image_id = '3a4560a1-e585-443e-9b39-553b46ec92d1'
         params = {'name': 'pong'}
         image = self.controller.update(image_id, **params)
         expect_hdrs = {
-            'Content-Type': 'application/openstack-images-v2.0-json-patch',
+            'Content-Type': 'application/openstack-images-v2.1-json-patch',
         }
         expect_body = '[{"path": "/name", "value": "pong", "op": "replace"}]'
         expect = [
@@ -423,3 +527,90 @@ class TestController(testtools.TestCase):
         #NOTE(bcwaldon): due to limitations of our fake api framework, the name
         # will not actually change - yet in real life it will...
         self.assertEqual(image.name, 'image-1')
+
+    def test_update_add_prop(self):
+        image_id = '3a4560a1-e585-443e-9b39-553b46ec92d1'
+        params = {'finn': 'human'}
+        image = self.controller.update(image_id, **params)
+        expect_hdrs = {
+            'Content-Type': 'application/openstack-images-v2.1-json-patch',
+        }
+        expect_body = '[{"path": "/finn", "value": "human", "op": "add"}]'
+        expect = [
+            ('GET', '/v2/images/%s' % image_id, {}, None),
+            ('PATCH', '/v2/images/%s' % image_id, expect_hdrs, expect_body),
+            ('GET', '/v2/images/%s' % image_id, {}, None),
+        ]
+        self.assertEqual(self.api.calls, expect)
+        self.assertEqual(image.id, image_id)
+        #NOTE(bcwaldon): due to limitations of our fake api framework, the name
+        # will not actually change - yet in real life it will...
+        self.assertEqual(image.name, 'image-1')
+
+    def test_update_remove_prop(self):
+        image_id = 'e7e59ff6-fa2e-4075-87d3-1a1398a07dc3'
+        remove_props = ['barney']
+        image = self.controller.update(image_id, remove_props)
+        expect_hdrs = {
+            'Content-Type': 'application/openstack-images-v2.1-json-patch',
+        }
+        expect_body = '[{"path": "/barney", "op": "remove"}]'
+        expect = [
+            ('GET', '/v2/images/%s' % image_id, {}, None),
+            ('PATCH', '/v2/images/%s' % image_id, expect_hdrs, expect_body),
+            ('GET', '/v2/images/%s' % image_id, {}, None),
+        ]
+        self.assertEqual(self.api.calls, expect)
+        self.assertEqual(image.id, image_id)
+        #NOTE(bcwaldon): due to limitations of our fake api framework, the name
+        # will not actually change - yet in real life it will...
+        self.assertEqual(image.name, 'image-3')
+
+    def test_update_replace_remove_same_prop(self):
+        image_id = 'e7e59ff6-fa2e-4075-87d3-1a1398a07dc3'
+        # Updating a property takes precedence over removing a property
+        params = {'barney': 'miller'}
+        remove_props = ['barney']
+        image = self.controller.update(image_id, remove_props, **params)
+        expect_hdrs = {
+            'Content-Type': 'application/openstack-images-v2.1-json-patch',
+        }
+        expect_body = '[{"path": "/barney", "value": "miller", ' \
+                      '"op": "replace"}]'
+        expect = [
+            ('GET', '/v2/images/%s' % image_id, {}, None),
+            ('PATCH', '/v2/images/%s' % image_id, expect_hdrs, expect_body),
+            ('GET', '/v2/images/%s' % image_id, {}, None),
+        ]
+        self.assertEqual(self.api.calls, expect)
+        self.assertEqual(image.id, image_id)
+        #NOTE(bcwaldon): due to limitations of our fake api framework, the name
+        # will not actually change - yet in real life it will...
+        self.assertEqual(image.name, 'image-3')
+
+    def test_update_add_remove_same_prop(self):
+        image_id = 'e7e59ff6-fa2e-4075-87d3-1a1398a07dc3'
+        # Adding a property takes precedence over removing a property
+        params = {'finn': 'human'}
+        remove_props = ['finn']
+        image = self.controller.update(image_id, remove_props, **params)
+        expect_hdrs = {
+            'Content-Type': 'application/openstack-images-v2.1-json-patch',
+        }
+        expect_body = '[{"path": "/finn", "value": "human", "op": "add"}]'
+        expect = [
+            ('GET', '/v2/images/%s' % image_id, {}, None),
+            ('PATCH', '/v2/images/%s' % image_id, expect_hdrs, expect_body),
+            ('GET', '/v2/images/%s' % image_id, {}, None),
+        ]
+        self.assertEqual(self.api.calls, expect)
+        self.assertEqual(image.id, image_id)
+        #NOTE(bcwaldon): due to limitations of our fake api framework, the name
+        # will not actually change - yet in real life it will...
+        self.assertEqual(image.name, 'image-3')
+
+    def test_update_bad_additionalProperty_type(self):
+        image_id = 'e7e59ff6-fa2e-4075-87d3-1a1398a07dc3'
+        params = {'name': 'pong', 'bad_prop': False}
+        with testtools.ExpectedException(TypeError):
+            self.controller.update(image_id, **params)

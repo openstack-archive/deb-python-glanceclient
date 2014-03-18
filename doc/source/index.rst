@@ -37,6 +37,30 @@ See also :doc:`/man/glance`.
 Release Notes
 =============
 
+0.12.0
+------
+
+* Add command line support for V2 image create, update, and upload
+* Enable querying for images by tag
+* 1230032_, 1231524_: Fix several issues with handling redirects
+* 1206095_: Use openstack-images-v2.1-json-patch for update method
+
+.. _1230032: http://bugs.launchpad.net/python-glanceclient/+bug/1230032
+.. _1231524: http://bugs.launchpad.net/python-glanceclient/+bug/1231524
+.. _1206095: http://bugs.launchpad.net/python-glanceclient/+bug/1206095
+
+0.11.0
+------
+
+* 1212463_: Allow single-wildcard SSL common name matching
+* 1208618_: Support absolute redirects for endpoint urls
+* 1190606_: Properly handle integer-like image ids
+* Support removing properties from images in the v2 library
+
+.. _1212463: http://bugs.launchpad.net/python-glanceclient/+bug/1212463
+.. _1208618: http://bugs.launchpad.net/python-glanceclient/+bug/1208618
+.. _1190606: http://bugs.launchpad.net/python-glanceclient/+bug/1190606
+
 0.10.0
 ------
 

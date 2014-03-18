@@ -1,4 +1,4 @@
-# Copyright 2012 OpenStack LLC.
+# Copyright 2012 OpenStack Foundation
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -14,7 +14,6 @@
 #    under the License.
 
 import errno
-import httplib
 import socket
 import StringIO
 import urlparse
@@ -25,6 +24,7 @@ import testtools
 from glanceclient import exc
 import glanceclient
 from glanceclient.common import http
+from six.moves import http_client
 from tests import utils
 
 
@@ -33,8 +33,8 @@ class TestClient(testtools.TestCase):
     def setUp(self):
         super(TestClient, self).setUp()
         self.mock = mox.Mox()
-        self.mock.StubOutWithMock(httplib.HTTPConnection, 'request')
-        self.mock.StubOutWithMock(httplib.HTTPConnection, 'getresponse')
+        self.mock.StubOutWithMock(http_client.HTTPConnection, 'request')
+        self.mock.StubOutWithMock(http_client.HTTPConnection, 'getresponse')
 
         self.endpoint = 'http://example.com:9292'
         self.client = http.HTTPClient(self.endpoint, token=u'abc123')
@@ -56,7 +56,7 @@ class TestClient(testtools.TestCase):
         kwargs = {'token': u'fake-token',
                   'identity_headers': identity_headers}
         http_client_object = http.HTTPClient(self.endpoint, **kwargs)
-        self.assertEquals(http_client_object.auth_token, 'auth_token')
+        self.assertEqual(http_client_object.auth_token, 'auth_token')
         self.assertTrue(http_client_object.identity_headers.
                         get('X-Auth-Token') is None)
 
@@ -72,7 +72,7 @@ class TestClient(testtools.TestCase):
         kwargs = {'token': u'fake-token',
                   'identity_headers': identity_headers}
         http_client_object = http.HTTPClient(self.endpoint, **kwargs)
-        self.assertEquals(http_client_object.auth_token, u'fake-token')
+        self.assertEqual(http_client_object.auth_token, u'fake-token')
         self.assertTrue(http_client_object.identity_headers.
                         get('X-Auth-Token') is None)
 
@@ -82,7 +82,7 @@ class TestClient(testtools.TestCase):
         And the error should list the host and port that refused the
         connection
         """
-        httplib.HTTPConnection.request(
+        http_client.HTTPConnection.request(
             mox.IgnoreArg(),
             mox.IgnoreArg(),
             headers=mox.IgnoreArg(),
@@ -100,8 +100,32 @@ class TestClient(testtools.TestCase):
                        (comm_err.message, self.endpoint))
             self.assertTrue(self.endpoint in comm_err.message, fail_msg)
 
+    def test_request_redirected(self):
+        resp = utils.FakeResponse({'location': 'http://www.example.com'},
+                                  status=302, body=StringIO.StringIO())
+        http_client.HTTPConnection.request(
+            mox.IgnoreArg(),
+            mox.IgnoreArg(),
+            headers=mox.IgnoreArg(),
+        )
+        http_client.HTTPConnection.getresponse().AndReturn(resp)
+
+        # The second request should be to the redirected location
+        expected_response = 'Ok'
+        resp2 = utils.FakeResponse({}, StringIO.StringIO(expected_response))
+        http_client.HTTPConnection.request(
+            'GET',
+            'http://www.example.com',
+            headers=mox.IgnoreArg(),
+        )
+        http_client.HTTPConnection.getresponse().AndReturn(resp2)
+
+        self.mock.ReplayAll()
+
+        self.client.json_request('GET', '/v1/images/detail')
+
     def test_http_encoding(self):
-        httplib.HTTPConnection.request(
+        http_client.HTTPConnection.request(
             mox.IgnoreArg(),
             mox.IgnoreArg(),
             headers=mox.IgnoreArg())
@@ -110,7 +134,7 @@ class TestClient(testtools.TestCase):
         # returned by httplib
         expected_response = 'Ok'
         fake = utils.FakeResponse({}, StringIO.StringIO(expected_response))
-        httplib.HTTPConnection.getresponse().AndReturn(fake)
+        http_client.HTTPConnection.getresponse().AndReturn(fake)
         self.mock.ReplayAll()
 
         headers = {"test": u'ni\xf1o'}
@@ -131,17 +155,45 @@ class TestClient(testtools.TestCase):
             # NOTE(kmcdonald): See bug #1179984 for more details.
             self.assertEqual(path, '/v1/images/detail')
 
-        httplib.HTTPConnection.request(
+        http_client.HTTPConnection.request(
             mox.IgnoreArg(),
             mox.IgnoreArg(),
             headers=mox.IgnoreArg()).WithSideEffects(check_request)
 
         # fake the response returned by httplib
         fake = utils.FakeResponse({}, StringIO.StringIO('Ok'))
-        httplib.HTTPConnection.getresponse().AndReturn(fake)
+        http_client.HTTPConnection.getresponse().AndReturn(fake)
         self.mock.ReplayAll()
 
         resp, body = self.client.raw_request('GET', '/v1/images/detail')
+        self.assertEqual(resp, fake)
+
+    def test_customized_path_raw_request(self):
+        """
+        Verify the customized path being used for HTTP requests
+        reflects accurately
+        """
+
+        def check_request(method, path, **kwargs):
+            self.assertEqual(method, 'GET')
+            self.assertEqual(path, '/customized-path/v1/images/detail')
+
+        # NOTE(yuyangbj): see bug 1230032 to get more info
+        endpoint = 'http://example.com:9292/customized-path'
+        client = http.HTTPClient(endpoint, token=u'abc123')
+        self.assertEqual(client.endpoint_path, '/customized-path')
+
+        http_client.HTTPConnection.request(
+            mox.IgnoreArg(),
+            mox.IgnoreArg(),
+            headers=mox.IgnoreArg()).WithSideEffects(check_request)
+
+        # fake the response returned by httplib
+        fake = utils.FakeResponse({}, StringIO.StringIO('Ok'))
+        http_client.HTTPConnection.getresponse().AndReturn(fake)
+        self.mock.ReplayAll()
+
+        resp, body = client.raw_request('GET', '/v1/images/detail')
         self.assertEqual(resp, fake)
 
     def test_connection_refused_raw_request(self):
@@ -152,9 +204,9 @@ class TestClient(testtools.TestCase):
         """
         endpoint = 'http://example.com:9292'
         client = http.HTTPClient(endpoint, token=u'abc123')
-        httplib.HTTPConnection.request(mox.IgnoreArg(), mox.IgnoreArg(),
-                                       headers=mox.IgnoreArg()
-                                       ).AndRaise(socket.error())
+        http_client.HTTPConnection.request(mox.IgnoreArg(), mox.IgnoreArg(),
+                                           headers=mox.IgnoreArg()
+                                           ).AndRaise(socket.error())
         self.mock.ReplayAll()
         try:
             client.raw_request('GET', '/v1/images/detail?limit=20')

@@ -1,4 +1,4 @@
-# Copyright 2012 OpenStack LLC.
+# Copyright 2012 OpenStack Foundation
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -428,6 +428,17 @@ class ImageManagerTest(testtools.TestCase):
 
     def test_get(self):
         image = self.mgr.get('1')
+        expect = [('HEAD', '/v1/images/1', {}, None)]
+        self.assertEqual(self.api.calls, expect)
+        self.assertEqual(image.id, '1')
+        self.assertEqual(image.name, 'image-1')
+        self.assertEqual(image.is_public, False)
+        self.assertEqual(image.protected, False)
+        self.assertEqual(image.deleted, False)
+        self.assertEqual(image.properties, {u'arch': u'x86_64'})
+
+    def test_get_int(self):
+        image = self.mgr.get(1)
         expect = [('HEAD', '/v1/images/1', {}, None)]
         self.assertEqual(self.api.calls, expect)
         self.assertEqual(image.id, '1')

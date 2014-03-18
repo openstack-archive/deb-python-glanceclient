@@ -1,4 +1,4 @@
-# Copyright 2012 OpenStack LLC.
+# Copyright 2012 OpenStack Foundation
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -17,7 +17,6 @@ import urllib
 
 import warlock
 
-from glanceclient.common import utils
 from glanceclient.openstack.common import strutils
 
 DEFAULT_PAGE_SIZE = 20
@@ -53,11 +52,21 @@ class Controller(object):
         else:
             filters['limit'] = kwargs['page_size']
 
+        tags = filters.pop('tag', [])
+        tags_url_params = []
+
+        for tag in tags:
+            if isinstance(tag, basestring):
+                tags_url_params.append({'tag': strutils.safe_encode(tag)})
+
         for param, value in filters.iteritems():
             if isinstance(value, basestring):
                 filters[param] = strutils.safe_encode(value)
 
         url = '/v2/images?%s' % urllib.urlencode(filters)
+
+        for param in tags_url_params:
+            url = '%s&%s' % (url, urllib.urlencode(param))
 
         for image in paginate(url):
             #NOTE(bcwaldon): remove 'self' for now until we have an elegant
@@ -112,8 +121,8 @@ class Controller(object):
         for (key, value) in kwargs.items():
             try:
                 setattr(image, key, value)
-            except warlock.InvalidOperation, e:
-                raise TypeError(utils.exception_to_str(e))
+            except warlock.InvalidOperation as e:
+                raise TypeError(unicode(e))
 
         resp, body = self.http_client.json_request('POST', url, body=image)
         #NOTE(esheffield): remove 'self' for now until we have an elegant
@@ -121,19 +130,34 @@ class Controller(object):
         body.pop('self', None)
         return self.model(**body)
 
-    def update(self, image_id, **kwargs):
+    def update(self, image_id, remove_props=None, **kwargs):
         """
         Update attributes of an image.
 
         :param image_id: ID of the image to modify.
+        :param remove_props: List of property names to remove
         :param **kwargs: Image attribute names and their new values.
         """
         image = self.get(image_id)
         for (key, value) in kwargs.items():
-            setattr(image, key, value)
+            try:
+                setattr(image, key, value)
+            except warlock.InvalidOperation as e:
+                raise TypeError(unicode(e))
+
+        if remove_props is not None:
+            cur_props = image.keys()
+            new_props = kwargs.keys()
+            #NOTE(esheffield): Only remove props that currently exist on the
+            # image and are NOT in the properties being updated / added
+            props_to_remove = set(cur_props).intersection(
+                set(remove_props).difference(new_props))
+
+            for key in props_to_remove:
+                delattr(image, key)
 
         url = '/v2/images/%s' % image_id
-        hdrs = {'Content-Type': 'application/openstack-images-v2.0-json-patch'}
+        hdrs = {'Content-Type': 'application/openstack-images-v2.1-json-patch'}
         self.http_client.raw_request('PATCH', url,
                                      headers=hdrs,
                                      body=image.patch)

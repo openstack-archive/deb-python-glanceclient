@@ -1,4 +1,4 @@
-# Copyright 2012 OpenStack LLC.
+# Copyright 2012 OpenStack Foundation
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -16,13 +16,14 @@
 import copy
 import errno
 import hashlib
-import httplib
 import logging
 import posixpath
 import socket
 import StringIO
 import struct
 import urlparse
+
+from six.moves import http_client
 
 try:
     import json
@@ -52,7 +53,7 @@ try:
     else:
         raise ImportError
 except ImportError:
-    from httplib import HTTPSConnection
+    HTTPSConnection = http_client.HTTPSConnection
     from OpenSSL.SSL import Connection as Connection
 
 
@@ -91,7 +92,7 @@ class HTTPClient(object):
         if scheme == 'https':
             return VerifiedHTTPSConnection
         else:
-            return httplib.HTTPConnection
+            return http_client.HTTPConnection
 
     @staticmethod
     def get_connection_kwargs(scheme, **kwargs):
@@ -111,7 +112,7 @@ class HTTPClient(object):
         try:
             return _class(self.endpoint_hostname, self.endpoint_port,
                           **self.connection_kwargs)
-        except httplib.InvalidURL:
+        except http_client.InvalidURL:
             raise exc.InvalidEndpoint()
 
     def log_curl_request(self, method, url, kwargs):
@@ -191,8 +192,21 @@ class HTTPClient(object):
 
         try:
             if self.endpoint_path:
-                url = '%s/%s' % (self.endpoint_path, url)
-            conn_url = posixpath.normpath(url)
+                # NOTE(yuyangbj): this method _http_request could either be
+                # called by API layer, or be called recursively with
+                # redirection. For example, url would be '/v1/images/detail'
+                # from API layer, but url would be 'https://example.com:92/
+                # v1/images/detail'  from recursion.
+                # See bug #1230032 and bug #1208618.
+                if url is not None:
+                    all_parts = urlparse.urlparse(url)
+                    if not (all_parts.scheme and all_parts.netloc):
+                        norm_parse = posixpath.normpath
+                        url = norm_parse('/'.join([self.endpoint_path, url]))
+                else:
+                    url = self.endpoint_path
+
+            conn_url = urlparse.urlsplit(url).geturl()
             # Note(flaper87): Ditto, headers / url
             # encoding to make httplib happy.
             conn_url = strutils.safe_encode(conn_url)
@@ -216,7 +230,8 @@ class HTTPClient(object):
             raise exc.InvalidEndpoint(message=message)
         except (socket.error, socket.timeout) as e:
             endpoint = self.endpoint
-            message = "Error communicating with %(endpoint)s %(e)s" % locals()
+            message = ("Error communicating with %(endpoint)s %(e)s" %
+                       {'endpoint': endpoint, 'e': e})
             raise exc.CommunicationError(message=message)
 
         body_iter = ResponseBodyIterator(resp)
@@ -234,7 +249,8 @@ class HTTPClient(object):
             raise exc.from_response(resp, body_str)
         elif resp.status in (301, 302, 305):
             # Redirected. Reissue the request to the new location.
-            return self._http_request(resp['location'], method, **kwargs)
+            return self._http_request(resp.getheader('location', None), method,
+                                      **kwargs)
         elif resp.status == 300:
             raise exc.from_response(resp)
 
@@ -249,7 +265,7 @@ class HTTPClient(object):
 
         resp, body_iter = self._http_request(url, method, **kwargs)
 
-        if 'application/json' in resp.getheader('content-type', None):
+        if 'application/json' in resp.getheader('content-type', ''):
             body = ''.join([chunk for chunk in body_iter])
             try:
                 body = json.loads(body)
@@ -327,9 +343,16 @@ class VerifiedHTTPSConnection(HTTPSConnection):
         connecting to, ie that the certificate's Common Name
         or a Subject Alternative Name matches 'host'.
         """
+        common_name = x509.get_subject().commonName
+
         # First see if we can match the CN
-        if x509.get_subject().commonName == host:
+        if common_name == host:
             return True
+
+        # Support single wildcard matching
+        if common_name.startswith('*.') and host.find('.') > 0:
+            if common_name[2:] == host.split('.', 1)[1]:
+                return True
 
         # Also try Subject Alternative Names for a match
         san_list = None
@@ -343,7 +366,7 @@ class VerifiedHTTPSConnection(HTTPSConnection):
 
         # Server certificate does not match host
         msg = ('Host "%s" does not match x509 certificate contents: '
-               'CommonName "%s"' % (host, x509.get_subject().commonName))
+               'CommonName "%s"' % (host, common_name))
         if san_list is not None:
             msg = msg + ', subjectAltName "%s"' % san_list
         raise exc.SSLCertificateError(msg)

@@ -1,4 +1,4 @@
-# Copyright 2012 OpenStack LLC.
+# Copyright 2012 OpenStack Foundation
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -13,15 +13,11 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from __future__ import print_function
+
 import argparse
 import copy
-import os
 import sys
-
-if os.name == 'nt':
-    import msvcrt
-else:
-    msvcrt = None
 
 from glanceclient import exc
 from glanceclient.common import utils
@@ -64,7 +60,7 @@ DISK_FORMATS = ('Acceptable formats: ami, ari, aki, vhd, vmdk, raw, '
 @utils.arg('--sort-dir', default='asc',
            choices=glanceclient.v1.images.SORT_DIR_VALUES,
            help='Sort image list in specified direction.')
-@utils.arg('--is-public', type=utils.string_to_bool, metavar='{True|False}',
+@utils.arg('--is-public', type=utils.string_to_bool, metavar='{True,False}',
            help=('Allows the user to select a listing of public or non '
                  'public images.'))
 @utils.arg('--owner', default=None, metavar='<TENANT_ID>',
@@ -125,30 +121,7 @@ def _image_show(image, human_readable=False):
 
 def _set_data_field(fields, args):
     if 'location' not in fields and 'copy_from' not in fields:
-        if args.file:
-            fields['data'] = open(args.file, 'rb')
-        else:
-            # distinguish cases where:
-            # (1) stdin is not valid (as in cron jobs):
-            #     glance ... <&-
-            # (2) image data is provided through standard input:
-            #     glance ... < /tmp/file or cat /tmp/file | glance ...
-            # (3) no image data provided:
-            #     glance ...
-            try:
-                os.fstat(0)
-            except OSError:
-                # (1) stdin is not valid (closed...)
-                fields['data'] = None
-                return
-            if not sys.stdin.isatty():
-                # (2) image data is provided through standard input
-                if msvcrt:
-                    msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
-                fields['data'] = sys.stdin
-            else:
-                # (3) no image data provided
-                fields['data'] = None
+        fields['data'] = utils.get_data_file(args)
 
 
 @utils.arg('image', metavar='<IMAGE>', help='Name or ID of image to describe.')
@@ -215,9 +188,9 @@ def do_image_download(gc, args):
 # to use --is-public
 @utils.arg('--public', action='store_true', default=False,
            help=argparse.SUPPRESS)
-@utils.arg('--is-public', type=utils.string_to_bool, metavar='[True|False]',
+@utils.arg('--is-public', type=utils.string_to_bool, metavar='{True,False}',
            help='Make image accessible to the public.')
-@utils.arg('--is-protected', type=utils.string_to_bool, metavar='[True|False]',
+@utils.arg('--is-protected', type=utils.string_to_bool, metavar='{True,False}',
            help='Prevent image from being deleted.')
 @utils.arg('--property', metavar="<key=value>", action='append', default=[],
            help=("Arbitrary property to associate with image. "
@@ -287,9 +260,9 @@ def do_image_create(gc, args):
            help=('Similar to \'--location\' in usage, but this indicates that'
                  ' the Glance server should immediately copy the data and'
                  ' store it in its configured image store.'))
-@utils.arg('--is-public', type=utils.string_to_bool, metavar='[True|False]',
+@utils.arg('--is-public', type=utils.string_to_bool, metavar='{True,False}',
            help='Make image accessible to the public.')
-@utils.arg('--is-protected', type=utils.string_to_bool, metavar='[True|False]',
+@utils.arg('--is-protected', type=utils.string_to_bool, metavar='{True,False}',
            help='Prevent image from being deleted.')
 @utils.arg('--property', metavar="<key=value>", action='append', default=[],
            help=("Arbitrary property to associate with image. "
@@ -344,18 +317,18 @@ def do_image_delete(gc, args):
         image = utils.find_resource(gc.images, args_image)
         try:
             if args.verbose:
-                print 'Requesting image delete for %s ...' % \
-                      strutils.safe_encode(args_image),
+                print('Requesting image delete for %s ...' %
+                      strutils.safe_encode(args_image), end=' ')
 
             gc.images.delete(image)
 
             if args.verbose:
-                print '[Done]'
+                print('[Done]')
 
         except exc.HTTPException as e:
             if args.verbose:
-                print '[Fail]'
-            print '%s: Unable to delete image %s' % (e, args_image)
+                print('[Fail]')
+            print('%s: Unable to delete image %s' % (e, args_image))
 
 
 @utils.arg('--image-id', metavar='<IMAGE_ID>',
@@ -365,14 +338,14 @@ def do_image_delete(gc, args):
 def do_member_list(gc, args):
     """Describe sharing permissions by image or tenant."""
     if args.image_id and args.tenant_id:
-        print 'Unable to filter members by both --image-id and --tenant-id.'
+        print('Unable to filter members by both --image-id and --tenant-id.')
         sys.exit(1)
     elif args.image_id:
         kwargs = {'image': args.image_id}
     elif args.tenant_id:
         kwargs = {'member': args.tenant_id}
     else:
-        print 'Unable to list all members. Specify --image-id or --tenant-id'
+        print('Unable to list all members. Specify --image-id or --tenant-id')
         sys.exit(1)
 
     members = gc.image_members.list(**kwargs)
@@ -402,6 +375,6 @@ def do_member_delete(gc, args):
     if not args.dry_run:
         gc.image_members.delete(image_id, args.tenant_id)
     else:
-        print "Dry run. We would have done the following:"
-        print ('Remove "%s" from the member list of image '
-               '"%s"' % (args.tenant_id, args.image))
+        print("Dry run. We would have done the following:")
+        print('Remove "%s" from the member list of image '
+              '"%s"' % (args.tenant_id, args.image))
