@@ -9,8 +9,8 @@ Uploaders: Julien Danjou <acid@debian.org>,
 Build-Depends: debhelper (>= 9),
                openstack-pkg-tools,
                python-all (>= 2.6.6-3~),
-                     python-setuptools,
-               python-pbr (>= 0.5.21)
+               python-pbr (>= 0.5.21),
+               python-setuptools
 Build-Depends-Indep: python-coverage (>= 3.6),
                      python-distribute,
                      python-hacking (>= 0.8),
@@ -23,8 +23,8 @@ Build-Depends-Indep: python-coverage (>= 3.6),
                      python-nosexcover,
                      python-openssl,
                      python-oslo.config,
-                     python-py (>= 1.4.9),
                      python-prettytable,
+                     python-py (>= 1.4.9),
                      python-requests,
                      python-simplejson,
                      python-sphinx,
@@ -34,8 +34,8 @@ Build-Depends-Indep: python-coverage (>= 3.6),
                      python-tox,
                      python-unittest2,
                      python-warlock (>= 1.0.1),
-                     testrepository (>= 0.0.17),
-                     subunit
+                     subunit,
+                     testrepository (>= 0.0.17)
 Standards-Version: 3.9.5
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-glanceclient.git;a=summary
 Vcs-Git: git://anonscm.debian.org/openstack/python-glanceclient.git
@@ -56,7 +56,8 @@ Depends: python-httplib2,
          python-simplejson,
          python-warlock (>= 1.0.1),
          ${misc:Depends},
-         ${python:Depends}
+         ${python:Depends},
+         ${sphinxdoc:Depends}
 Replaces: glance-common (<< 2012.2)
 Breaks: glance-common (<< 2012.2)
 Description: Client library for Openstack glance server
