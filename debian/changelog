@@ -1,5 +1,7 @@
-python-glanceclient (1:0.10.0-3) UNRELEASED; urgency=low
+python-glanceclient (1:0.12.0-1) experimental; urgency=low
 
+  * New upstream release.
+  * New (build-)depends set for this release.
   * Added --testr-args='--subunit  ' when calling testr.
 
  -- Thomas Goirand <zigo@debian.org>  Tue, 01 Oct 2013 15:08:09 +0800
