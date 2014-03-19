@@ -10,7 +10,7 @@ Build-Depends: debhelper (>= 9),
                openstack-pkg-tools,
                python-all (>= 2.6.6-3~),
                      python-setuptools,
-               python-pbr (>= 0.21)
+               python-pbr (>= 0.5.21)
 Build-Depends-Indep: python-coverage (>= 3.6),
                      python-distribute,
                      python-hacking (>= 0.8),
