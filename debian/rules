@@ -5,7 +5,7 @@ include /usr/share/openstack-pkg-tools/pkgos.make
 export OSLO_PACKAGE_VERSION=$(VERSION)
 
 %:
-	dh $@ --buildsystem=python_distutils --with python2
+	dh $@ --buildsystem=python_distutils --with python2,sphinxdoc
 
 override_dh_auto_configure:
 	echo $(VERSION) > glanceclient/versioninfo
@@ -45,3 +45,13 @@ ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
 	sphinx-build -b html doc/source $(CURDIR)/debian/python-glanceclient/usr/share/doc/python-glanceclient/html
 	dh_sphinxdoc -O--buildsystem=python_distutils
 endif
+
+# Commands not to run
+override_dh_installcatalogs:
+override_dh_installemacsen override_dh_installifupdown:
+override_dh_installinfo override_dh_installmenu override_dh_installmime:
+override_dh_installmodules override_dh_installlogcheck:
+override_dh_installpam override_dh_installppp override_dh_installudev:
+override_dh_installwm:
+override_dh_installxfonts override_dh_gconf override_dh_icons:
+override_dh_perl override_dh_usrlocal:
