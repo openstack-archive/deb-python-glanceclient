@@ -5,7 +5,7 @@ python-glanceclient (1:0.12.0-1) experimental; urgency=low
   * Added --testr-args='--subunit  ' when calling testr.
   * Now packaging upstream manpage and doc.
 
- -- Thomas Goirand <zigo@debian.org>  Tue, 01 Oct 2013 15:08:09 +0800
+ -- Thomas Goirand <zigo@debian.org>  Wed, 19 Mar 2014 21:59:30 +0800
 
 python-glanceclient (1:0.10.0-2) unstable; urgency=low
 
