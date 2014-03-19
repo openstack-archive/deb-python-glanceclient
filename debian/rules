@@ -1,9 +1,5 @@
 #!/usr/bin/make -f
 
-#export DH_VERBOSE=1
-
-MANIFEST_EXCLUDE_STANDARD := glanceclient
-
 include /usr/share/openstack-pkg-tools/pkgos.make
 
 export OSLO_PACKAGE_VERSION=$(VERSION)
@@ -20,8 +16,7 @@ override_dh_auto_clean:
 	dh_auto_clean -O--buildsystem=python_distutils
 	rm -f glanceclient/versioninfo
 	rm -f ChangeLog
-	rm -rf setuptools_git-*-py*.egg/
-	rm -rf .tox python_glanceclient.egg-info
+	rm -rf .tox .testrepository
 
 override_dh_install:
 	dh_install -O--buildsystem=python_distutils
@@ -31,11 +26,16 @@ override_dh_auto_test:
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	set -e && \
 		TEMP_REZ=`mktemp -t` && \
-		python setup.py testr --slowest --testr-args='--subunit  ' \
-			| tee $$TEMP_REZ | subunit2pyunit || true ; \
+		testr --slowest --testr-args='--subunit  ' | tee $$TEMP_REZ | subunit2pyunit || true ; \
 		cat $$TEMP_REZ | subunit-filter -s --no-passthrough | subunit-stats ; \
 		rm -f $$TEMP_REZ
 	#python setup.py testr --testr-args='--subunit  '
 #	./run_tests.sh -N -P
 #	set -e ; for pyversion in $(shell pyversions -r); do $$pyversion setup.py test; done
+endif
+
+override_dh_installman:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	sphinx-build -b man doc/source doc/man
+	dh_installman -O--buildsystem=python_distutils
 endif
