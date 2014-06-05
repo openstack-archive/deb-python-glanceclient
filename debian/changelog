@@ -1,6 +1,6 @@
-python-glanceclient (1:0.12.0-1) experimental; urgency=low
+python-glanceclient (1:0.12.0-1) unstable; urgency=medium
 
-  * New upstream release.
+  * New upstream release. (Closes: #750227)
   * New (build-)depends set for this release.
   * Added --testr-args='--subunit  ' when calling testr.
   * Now packaging upstream manpage and doc.
