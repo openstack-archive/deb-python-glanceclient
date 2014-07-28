@@ -1,6 +1,7 @@
 python-glanceclient (1:0.13.1-1) unstable; urgency=medium
 
   * New upstream release.
+  * New (build-)depends for this release.
 
  -- Thomas Goirand <zigo@debian.org>  Mon, 28 Jul 2014 18:38:59 +0800
 
