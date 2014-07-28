@@ -15,16 +15,19 @@
 
 import errno
 import socket
-import StringIO
-import urlparse
 
-import mox
+import mock
+from mox3 import mox
+import six
+from six.moves import http_client
+from six.moves.urllib import parse
+import tempfile
 import testtools
 
-from glanceclient import exc
 import glanceclient
 from glanceclient.common import http
-from six.moves import http_client
+from glanceclient.common import utils as client_utils
+from glanceclient import exc
 from tests import utils
 
 
@@ -56,7 +59,7 @@ class TestClient(testtools.TestCase):
         kwargs = {'token': u'fake-token',
                   'identity_headers': identity_headers}
         http_client_object = http.HTTPClient(self.endpoint, **kwargs)
-        self.assertEqual(http_client_object.auth_token, 'auth_token')
+        self.assertEqual('auth_token', http_client_object.auth_token)
         self.assertTrue(http_client_object.identity_headers.
                         get('X-Auth-Token') is None)
 
@@ -72,7 +75,7 @@ class TestClient(testtools.TestCase):
         kwargs = {'token': u'fake-token',
                   'identity_headers': identity_headers}
         http_client_object = http.HTTPClient(self.endpoint, **kwargs)
-        self.assertEqual(http_client_object.auth_token, u'fake-token')
+        self.assertEqual(u'fake-token', http_client_object.auth_token)
         self.assertTrue(http_client_object.identity_headers.
                         get('X-Auth-Token') is None)
 
@@ -102,7 +105,7 @@ class TestClient(testtools.TestCase):
 
     def test_request_redirected(self):
         resp = utils.FakeResponse({'location': 'http://www.example.com'},
-                                  status=302, body=StringIO.StringIO())
+                                  status=302, body=six.BytesIO())
         http_client.HTTPConnection.request(
             mox.IgnoreArg(),
             mox.IgnoreArg(),
@@ -111,8 +114,8 @@ class TestClient(testtools.TestCase):
         http_client.HTTPConnection.getresponse().AndReturn(resp)
 
         # The second request should be to the redirected location
-        expected_response = 'Ok'
-        resp2 = utils.FakeResponse({}, StringIO.StringIO(expected_response))
+        expected_response = b'Ok'
+        resp2 = utils.FakeResponse({}, six.BytesIO(expected_response))
         http_client.HTTPConnection.request(
             'GET',
             'http://www.example.com',
@@ -132,28 +135,32 @@ class TestClient(testtools.TestCase):
 
         # Lets fake the response
         # returned by httplib
-        expected_response = 'Ok'
-        fake = utils.FakeResponse({}, StringIO.StringIO(expected_response))
+        expected_response = b'Ok'
+        fake = utils.FakeResponse({}, six.BytesIO(expected_response))
         http_client.HTTPConnection.getresponse().AndReturn(fake)
         self.mock.ReplayAll()
 
         headers = {"test": u'ni\xf1o'}
         resp, body = self.client.raw_request('GET', '/v1/images/detail',
                                                     headers=headers)
-        self.assertEqual(resp, fake)
+        self.assertEqual(fake, resp)
 
     def test_headers_encoding(self):
-        headers = {"test": u'ni\xf1o'}
+        value = u'ni\xf1o'
+        headers = {"test": value}
         encoded = self.client.encode_headers(headers)
-        self.assertEqual(encoded["test"], "ni\xc3\xb1o")
+        if six.PY2:
+            self.assertEqual("ni\xc3\xb1o", encoded["test"])
+        else:
+            self.assertEqual(value, encoded["test"])
 
     def test_raw_request(self):
         " Verify the path being used for HTTP requests reflects accurately. "
 
         def check_request(method, path, **kwargs):
-            self.assertEqual(method, 'GET')
+            self.assertEqual('GET', method)
             # NOTE(kmcdonald): See bug #1179984 for more details.
-            self.assertEqual(path, '/v1/images/detail')
+            self.assertEqual('/v1/images/detail', path)
 
         http_client.HTTPConnection.request(
             mox.IgnoreArg(),
@@ -161,12 +168,12 @@ class TestClient(testtools.TestCase):
             headers=mox.IgnoreArg()).WithSideEffects(check_request)
 
         # fake the response returned by httplib
-        fake = utils.FakeResponse({}, StringIO.StringIO('Ok'))
+        fake = utils.FakeResponse({}, six.BytesIO(b'Ok'))
         http_client.HTTPConnection.getresponse().AndReturn(fake)
         self.mock.ReplayAll()
 
         resp, body = self.client.raw_request('GET', '/v1/images/detail')
-        self.assertEqual(resp, fake)
+        self.assertEqual(fake, resp)
 
     def test_customized_path_raw_request(self):
         """
@@ -175,13 +182,13 @@ class TestClient(testtools.TestCase):
         """
 
         def check_request(method, path, **kwargs):
-            self.assertEqual(method, 'GET')
-            self.assertEqual(path, '/customized-path/v1/images/detail')
+            self.assertEqual('GET', method)
+            self.assertEqual('/customized-path/v1/images/detail', path)
 
         # NOTE(yuyangbj): see bug 1230032 to get more info
         endpoint = 'http://example.com:9292/customized-path'
         client = http.HTTPClient(endpoint, token=u'abc123')
-        self.assertEqual(client.endpoint_path, '/customized-path')
+        self.assertEqual('/customized-path', client.endpoint_path)
 
         http_client.HTTPConnection.request(
             mox.IgnoreArg(),
@@ -189,12 +196,92 @@ class TestClient(testtools.TestCase):
             headers=mox.IgnoreArg()).WithSideEffects(check_request)
 
         # fake the response returned by httplib
-        fake = utils.FakeResponse({}, StringIO.StringIO('Ok'))
+        fake = utils.FakeResponse({}, six.BytesIO(b'Ok'))
         http_client.HTTPConnection.getresponse().AndReturn(fake)
         self.mock.ReplayAll()
 
         resp, body = client.raw_request('GET', '/v1/images/detail')
-        self.assertEqual(resp, fake)
+        self.assertEqual(fake, resp)
+
+    def test_raw_request_no_content_length(self):
+        with tempfile.NamedTemporaryFile() as test_file:
+            test_file.write(b'abcd')
+            test_file.seek(0)
+            data_length = 4
+            self.assertEqual(data_length,
+                             client_utils.get_file_size(test_file))
+
+            exp_resp = {'body': test_file}
+            exp_resp['headers'] = {'Content-Length': str(data_length),
+                                   'Content-Type': 'application/octet-stream'}
+
+            def mock_request(url, method, **kwargs):
+                return kwargs
+
+            rq_kwargs = {'body': test_file, 'content_length': None}
+
+            with mock.patch.object(self.client, '_http_request') as mock_rq:
+                mock_rq.side_effect = mock_request
+                resp = self.client.raw_request('PUT', '/v1/images/detail',
+                                               **rq_kwargs)
+
+                rq_kwargs.pop('content_length')
+                headers = {'Content-Length': str(data_length),
+                           'Content-Type': 'application/octet-stream'}
+                rq_kwargs['headers'] = headers
+
+                mock_rq.assert_called_once_with('/v1/images/detail', 'PUT',
+                                                **rq_kwargs)
+
+            self.assertEqual(exp_resp, resp)
+
+    def test_raw_request_w_content_length(self):
+        with tempfile.NamedTemporaryFile() as test_file:
+            test_file.write(b'abcd')
+            test_file.seek(0)
+            data_length = 4
+            self.assertEqual(data_length,
+                             client_utils.get_file_size(test_file))
+
+            exp_resp = {'body': test_file}
+            # NOTE: we expect the actual file size to be overridden by the
+            # supplied content length.
+            exp_resp['headers'] = {'Content-Length': '4',
+                                   'Content-Type': 'application/octet-stream'}
+
+            def mock_request(url, method, **kwargs):
+                return kwargs
+
+            rq_kwargs = {'body': test_file, 'content_length': data_length}
+
+            with mock.patch.object(self.client, '_http_request') as mock_rq:
+                mock_rq.side_effect = mock_request
+                resp = self.client.raw_request('PUT', '/v1/images/detail',
+                                               **rq_kwargs)
+
+                rq_kwargs.pop('content_length')
+                headers = {'Content-Length': str(data_length),
+                           'Content-Type': 'application/octet-stream'}
+                rq_kwargs['headers'] = headers
+
+                mock_rq.assert_called_once_with('/v1/images/detail', 'PUT',
+                                                **rq_kwargs)
+
+            self.assertEqual(exp_resp, resp)
+
+    def test_raw_request_w_bad_content_length(self):
+        with tempfile.NamedTemporaryFile() as test_file:
+            test_file.write(b'abcd')
+            test_file.seek(0)
+            self.assertEqual(4, client_utils.get_file_size(test_file))
+
+            def mock_request(url, method, **kwargs):
+                return kwargs
+
+            with mock.patch.object(self.client, '_http_request', mock_request):
+                self.assertRaises(AttributeError, self.client.raw_request,
+                                  'PUT', '/v1/images/detail', body=test_file,
+                                  content_length=32)
 
     def test_connection_refused_raw_request(self):
         """
@@ -221,16 +308,16 @@ class TestClient(testtools.TestCase):
         endpoint = 'http://example.com:9292'
         test_client = http.HTTPClient(endpoint, token=u'adc123')
         actual = test_client.parse_endpoint(endpoint)
-        expected = urlparse.ParseResult(scheme='http',
-                                        netloc='example.com:9292', path='',
-                                        params='', query='', fragment='')
+        expected = parse.SplitResult(scheme='http',
+                                     netloc='example.com:9292', path='',
+                                     query='', fragment='')
         self.assertEqual(expected, actual)
 
     def test_get_connection_class(self):
         endpoint = 'http://example.com:9292'
         test_client = http.HTTPClient(endpoint, token=u'adc123')
         actual = (test_client.get_connection_class('https'))
-        self.assertEqual(actual, http.VerifiedHTTPSConnection)
+        self.assertEqual(http.VerifiedHTTPSConnection, actual)
 
     def test_get_connections_kwargs_http(self):
         endpoint = 'http://example.com:9292'
@@ -249,6 +336,16 @@ class TestClient(testtools.TestCase):
                     'ssl_compression': True,
                     'timeout': 600.0}
         self.assertEqual(expected, actual)
+
+    def test_log_curl_request_with_non_ascii_char(self):
+        try:
+            headers = {'header1': 'value1\xa5\xa6'}
+            http_client_object = http.HTTPClient(self.endpoint)
+            http_client_object.log_curl_request('GET',
+                                                'http://www.example.com/\xa5',
+                                                {'headers': headers})
+        except UnicodeDecodeError as e:
+            self.fail("Unexpected UnicodeDecodeError exception '%s'" % e)
 
 
 class TestHostResolutionError(testtools.TestCase):
@@ -293,22 +390,39 @@ class TestHostResolutionError(testtools.TestCase):
         self.mock.UnsetStubs()
 
 
+class TestVerifiedHTTPSConnection(testtools.TestCase):
+    """Test fixture for glanceclient.common.http.VerifiedHTTPSConnection."""
+
+    def test_setcontext_unable_to_load_cacert(self):
+        """Add this UT case with Bug#1265730."""
+        self.assertRaises(exc.SSLConfigurationError,
+                          http.VerifiedHTTPSConnection,
+                          "127.0.0.1",
+                          None,
+                          None,
+                          None,
+                          "gx_cacert",
+                          None,
+                          False,
+                          True)
+
+
 class TestResponseBodyIterator(testtools.TestCase):
 
     def test_iter_default_chunk_size_64k(self):
-        resp = utils.FakeResponse({}, StringIO.StringIO('X' * 98304))
+        resp = utils.FakeResponse({}, six.BytesIO(b'X' * 98304))
         iterator = http.ResponseBodyIterator(resp)
         chunks = list(iterator)
-        self.assertEqual(chunks, ['X' * 65536, 'X' * 32768])
+        self.assertEqual([b'X' * 65536, b'X' * 32768], chunks)
 
     def test_integrity_check_with_correct_checksum(self):
-        resp = utils.FakeResponse({}, StringIO.StringIO('CCC'))
+        resp = utils.FakeResponse({}, six.BytesIO(b'CCC'))
         body = http.ResponseBodyIterator(resp)
         body.set_checksum('defb99e69a9f1f6e06f15006b1f166ae')
         list(body)
 
     def test_integrity_check_with_wrong_checksum(self):
-        resp = utils.FakeResponse({}, StringIO.StringIO('BB'))
+        resp = utils.FakeResponse({}, six.BytesIO(b'BB'))
         body = http.ResponseBodyIterator(resp)
         body.set_checksum('wrong')
         try:
@@ -318,7 +432,7 @@ class TestResponseBodyIterator(testtools.TestCase):
             self.assertEqual(errno.EPIPE, e.errno)
 
     def test_set_checksum_in_consumed_iterator(self):
-        resp = utils.FakeResponse({}, StringIO.StringIO('CCC'))
+        resp = utils.FakeResponse({}, six.BytesIO(b'CCC'))
         body = http.ResponseBodyIterator(resp)
         list(body)
         # Setting checksum for an already consumed iterator should raise an
@@ -330,6 +444,6 @@ class TestResponseBodyIterator(testtools.TestCase):
     def test_body_size(self):
         size = 1000000007
         resp = utils.FakeResponse(
-            {'content-length': str(size)}, StringIO.StringIO('BB'))
+            {'content-length': str(size)}, six.BytesIO(b'BB'))
         body = http.ResponseBodyIterator(resp)
-        self.assertEqual(len(body), size)
+        self.assertEqual(size, len(body))

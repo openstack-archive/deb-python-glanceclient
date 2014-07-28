@@ -15,7 +15,7 @@
 
 import copy
 import requests
-import StringIO
+import six
 import testtools
 
 from glanceclient.common import http
@@ -26,20 +26,49 @@ class FakeAPI(object):
         self.fixtures = fixtures
         self.calls = []
 
-    def _request(self, method, url, headers=None, body=None):
+    def _request(self, method, url, headers=None, body=None,
+                 content_length=None):
         call = (method, url, headers or {}, body)
+        if content_length is not None:
+            call = tuple(list(call) + [content_length])
         self.calls.append(call)
         return self.fixtures[url][method]
 
     def raw_request(self, *args, **kwargs):
         fixture = self._request(*args, **kwargs)
-        resp = FakeResponse(fixture[0], StringIO.StringIO(fixture[1]))
+        resp = FakeResponse(fixture[0], six.StringIO(fixture[1]))
         body_iter = http.ResponseBodyIterator(resp)
         return resp, body_iter
 
     def json_request(self, *args, **kwargs):
         fixture = self._request(*args, **kwargs)
         return FakeResponse(fixture[0]), fixture[1]
+
+    def client_request(self, method, url, **kwargs):
+        if 'json' in kwargs and 'body' not in kwargs:
+            kwargs['body'] = kwargs.pop('json')
+        resp, body = self.json_request(method, url, **kwargs)
+        resp.json = lambda: body
+        resp.content = bool(body)
+        return resp
+
+    def head(self, url, **kwargs):
+        return self.client_request("HEAD", url, **kwargs)
+
+    def get(self, url, **kwargs):
+        return self.client_request("GET", url, **kwargs)
+
+    def post(self, url, **kwargs):
+        return self.client_request("POST", url, **kwargs)
+
+    def put(self, url, **kwargs):
+        return self.client_request("PUT", url, **kwargs)
+
+    def delete(self, url, **kwargs):
+        return self.raw_request("DELETE", url, **kwargs)
+
+    def patch(self, url, **kwargs):
+        return self.client_request("PATCH", url, **kwargs)
 
 
 class FakeResponse(object):
@@ -98,7 +127,7 @@ class TestResponse(requests.Response):
         return self._text
 
 
-class FakeTTYStdout(StringIO.StringIO):
+class FakeTTYStdout(six.StringIO):
     """A Fake stdout that try to emulate a TTY device as much as possible."""
 
     def isatty(self):
@@ -109,4 +138,11 @@ class FakeTTYStdout(StringIO.StringIO):
         if data.startswith('\r'):
             self.seek(0)
             data = data[1:]
-        return StringIO.StringIO.write(self, data)
+        return six.StringIO.write(self, data)
+
+
+class FakeNoTTYStdout(FakeTTYStdout):
+    """A Fake stdout that is not a TTY device."""
+
+    def isatty(self):
+        return False

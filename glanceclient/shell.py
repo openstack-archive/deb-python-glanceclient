@@ -20,19 +20,19 @@ Command-line interface to the OpenStack Images API.
 from __future__ import print_function
 
 import argparse
+import copy
 import json
 import logging
 import os
 from os.path import expanduser
-import re
 import sys
 
 from keystoneclient.v2_0 import client as ksclient
 import netaddr
 
 import glanceclient
-from glanceclient import exc
 from glanceclient.common import utils
+from glanceclient import exc
 from glanceclient.openstack.common import strutils
 
 
@@ -61,7 +61,7 @@ class OpenStackImagesShell(object):
         parser.add_argument('-d', '--debug',
                             default=bool(utils.env('GLANCECLIENT_DEBUG')),
                             action='store_true',
-                            help='Defaults to env[GLANCECLIENT_DEBUG]')
+                            help='Defaults to env[GLANCECLIENT_DEBUG].')
 
         parser.add_argument('-v', '--verbose',
                             default=False, action="store_true",
@@ -70,9 +70,9 @@ class OpenStackImagesShell(object):
         parser.add_argument('--get-schema',
                             default=False, action="store_true",
                             dest='get_schema',
-                            help='Force retrieving the schema used to generate'
-                                 ' portions of the help text rather than using'
-                                 ' a cached copy. Ignored with api version 1')
+                            help='Ignores cached copy and forces retrieval '
+                                 'of schema that generates portions of the '
+                                 'help text. Ignored with API version 1.')
 
         parser.add_argument('-k', '--insecure',
                             default=False,
@@ -153,7 +153,7 @@ class OpenStackImagesShell(object):
 
         parser.add_argument('--os-username',
                             default=utils.env('OS_USERNAME'),
-                            help='Defaults to env[OS_USERNAME]')
+                            help='Defaults to env[OS_USERNAME].')
 
         parser.add_argument('--os_username',
                             help=argparse.SUPPRESS)
@@ -165,7 +165,7 @@ class OpenStackImagesShell(object):
 
         parser.add_argument('--os-password',
                             default=utils.env('OS_PASSWORD'),
-                            help='Defaults to env[OS_PASSWORD]')
+                            help='Defaults to env[OS_PASSWORD].')
 
         parser.add_argument('--os_password',
                             help=argparse.SUPPRESS)
@@ -177,14 +177,14 @@ class OpenStackImagesShell(object):
 
         parser.add_argument('--os-tenant-id',
                             default=utils.env('OS_TENANT_ID'),
-                            help='Defaults to env[OS_TENANT_ID]')
+                            help='Defaults to env[OS_TENANT_ID].')
 
         parser.add_argument('--os_tenant_id',
                             help=argparse.SUPPRESS)
 
         parser.add_argument('--os-tenant-name',
                             default=utils.env('OS_TENANT_NAME'),
-                            help='Defaults to env[OS_TENANT_NAME]')
+                            help='Defaults to env[OS_TENANT_NAME].')
 
         parser.add_argument('--os_tenant_name',
                             help=argparse.SUPPRESS)
@@ -196,7 +196,7 @@ class OpenStackImagesShell(object):
 
         parser.add_argument('--os-auth-url',
                             default=utils.env('OS_AUTH_URL'),
-                            help='Defaults to env[OS_AUTH_URL]')
+                            help='Defaults to env[OS_AUTH_URL].')
 
         parser.add_argument('--os_auth_url',
                             help=argparse.SUPPRESS)
@@ -208,7 +208,7 @@ class OpenStackImagesShell(object):
 
         parser.add_argument('--os-region-name',
                             default=utils.env('OS_REGION_NAME'),
-                            help='Defaults to env[OS_REGION_NAME]')
+                            help='Defaults to env[OS_REGION_NAME].')
 
         parser.add_argument('--os_region_name',
                             help=argparse.SUPPRESS)
@@ -220,7 +220,7 @@ class OpenStackImagesShell(object):
 
         parser.add_argument('--os-auth-token',
                             default=utils.env('OS_AUTH_TOKEN'),
-                            help='Defaults to env[OS_AUTH_TOKEN]')
+                            help='Defaults to env[OS_AUTH_TOKEN].')
 
         parser.add_argument('--os_auth_token',
                             help=argparse.SUPPRESS)
@@ -232,7 +232,7 @@ class OpenStackImagesShell(object):
 
         parser.add_argument('--os-image-url',
                             default=utils.env('OS_IMAGE_URL'),
-                            help='Defaults to env[OS_IMAGE_URL]')
+                            help='Defaults to env[OS_IMAGE_URL].')
 
         parser.add_argument('--os_image_url',
                             help=argparse.SUPPRESS)
@@ -245,21 +245,21 @@ class OpenStackImagesShell(object):
         parser.add_argument('--os-image-api-version',
                             default=utils.env('OS_IMAGE_API_VERSION',
                                               default='1'),
-                            help='Defaults to env[OS_IMAGE_API_VERSION] or 1')
+                            help='Defaults to env[OS_IMAGE_API_VERSION] or 1.')
 
         parser.add_argument('--os_image_api_version',
                             help=argparse.SUPPRESS)
 
         parser.add_argument('--os-service-type',
                             default=utils.env('OS_SERVICE_TYPE'),
-                            help='Defaults to env[OS_SERVICE_TYPE]')
+                            help='Defaults to env[OS_SERVICE_TYPE].')
 
         parser.add_argument('--os_service_type',
                             help=argparse.SUPPRESS)
 
         parser.add_argument('--os-endpoint-type',
                             default=utils.env('OS_ENDPOINT_TYPE'),
-                            help='Defaults to env[OS_ENDPOINT_TYPE]')
+                            help='Defaults to env[OS_ENDPOINT_TYPE].')
 
         parser.add_argument('--os_endpoint_type',
                             help=argparse.SUPPRESS)
@@ -306,21 +306,6 @@ class OpenStackImagesShell(object):
                 subparser.add_argument(*args, **kwargs)
             subparser.set_defaults(func=callback)
 
-    # TODO(dtroyer): move this into the common client support?
-    # Compatibility check to remove API version as the trailing component
-    # in a service endpoint; also removes a trailing '/'
-    def _strip_version(self, endpoint):
-        """Strip version from the last component of endpoint if present."""
-
-        # Get rid of trailing '/' if present
-        if endpoint.endswith('/'):
-            endpoint = endpoint[:-1]
-        url_bits = endpoint.split('/')
-        # regex to match 'v1' or 'v2.0' etc
-        if re.match('v\d+\.?\d*', url_bits[-1]):
-            endpoint = '/'.join(url_bits[:-1])
-        return endpoint
-
     def _get_ksclient(self, **kwargs):
         """Get an endpoint and auth token from Keystone.
 
@@ -349,8 +334,7 @@ class OpenStackImagesShell(object):
             endpoint_kwargs['attr'] = 'region'
             endpoint_kwargs['filter_value'] = kwargs.get('region_name')
 
-        endpoint = client.service_catalog.url_for(**endpoint_kwargs)
-        return self._strip_version(endpoint)
+        return client.service_catalog.url_for(**endpoint_kwargs)
 
     def _get_image_url(self, args):
         """Translate the available url-related options into a single string.
@@ -448,7 +432,7 @@ class OpenStackImagesShell(object):
                                                     force_auth=True)
                 schema = client.schemas.get("image")
 
-                with file(schema_file_path, 'w') as f:
+                with open(schema_file_path, 'w') as f:
                     f.write(json.dumps(schema.raw()))
             except Exception as e:
                 #NOTE(esheffield) do nothing here, we'll get a message later
@@ -457,8 +441,12 @@ class OpenStackImagesShell(object):
 
     def main(self, argv):
         # Parse args once to find version
+
+        #NOTE(flepied) Under Python3, parsed arguments are removed
+        # from the list so make a copy for the first parsing
+        base_argv = copy.deepcopy(argv)
         parser = self.get_base_parser()
-        (options, args) = parser.parse_known_args(argv)
+        (options, args) = parser.parse_known_args(base_argv)
 
         # build available subcommands based on version
         api_version = options.os_image_api_version
@@ -496,7 +484,7 @@ class OpenStackImagesShell(object):
             raise exc.CommandError("Invalid OpenStack Identity credentials.")
 
     @utils.arg('command', metavar='<subcommand>', nargs='?',
-               help='Display help for <subcommand>')
+               help='Display help for <subcommand>.')
     def do_help(self, args):
         """
         Display help about this program or one of its subcommands.

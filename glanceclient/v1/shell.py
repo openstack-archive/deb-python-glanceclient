@@ -17,11 +17,12 @@ from __future__ import print_function
 
 import argparse
 import copy
+import six
 import sys
 
-from glanceclient import exc
-from glanceclient.common import utils
 from glanceclient.common import progressbar
+from glanceclient.common import utils
+from glanceclient import exc
 from glanceclient.openstack.common import strutils
 import glanceclient.v1.images
 
@@ -43,9 +44,9 @@ DISK_FORMATS = ('Acceptable formats: ami, ari, aki, vhd, vmdk, raw, '
 @utils.arg('--disk-format', metavar='<DISK_FORMAT>',
            help='Filter images to those that have this disk format. '
                 + DISK_FORMATS)
-@utils.arg('--size-min', metavar='<SIZE>',
+@utils.arg('--size-min', metavar='<SIZE>', type=int,
            help='Filter images to those with a size greater than this.')
-@utils.arg('--size-max', metavar='<SIZE>',
+@utils.arg('--size-max', metavar='<SIZE>', type=int,
            help='Filter images to those with a size less than this.')
 @utils.arg('--property-filter', metavar='<KEY=VALUE>',
            help="Filter images by a user-defined image property.",
@@ -60,7 +61,8 @@ DISK_FORMATS = ('Acceptable formats: ami, ari, aki, vhd, vmdk, raw, '
 @utils.arg('--sort-dir', default='asc',
            choices=glanceclient.v1.images.SORT_DIR_VALUES,
            help='Sort image list in specified direction.')
-@utils.arg('--is-public', type=utils.string_to_bool, metavar='{True,False}',
+@utils.arg('--is-public',
+           type=strutils.bool_from_string, metavar='{True,False}',
            help=('Allows the user to select a listing of public or non '
                  'public images.'))
 @utils.arg('--owner', default=None, metavar='<TENANT_ID>',
@@ -108,15 +110,15 @@ def do_image_list(gc, args):
     utils.print_list(images, columns)
 
 
-def _image_show(image, human_readable=False):
+def _image_show(image, human_readable=False, max_column_width=80):
     # Flatten image properties dict for display
     info = copy.deepcopy(image._info)
     if human_readable:
         info['size'] = utils.make_size_human_readable(info['size'])
-    for (k, v) in info.pop('properties').iteritems():
+    for (k, v) in six.iteritems(info.pop('properties')):
         info['Property \'%s\'' % k] = v
 
-    utils.print_dict(info)
+    utils.print_dict(info, max_column_width=max_column_width)
 
 
 def _set_data_field(fields, args):
@@ -127,11 +129,14 @@ def _set_data_field(fields, args):
 @utils.arg('image', metavar='<IMAGE>', help='Name or ID of image to describe.')
 @utils.arg('--human-readable', action='store_true', default=False,
            help='Print image size in a human-friendly format.')
+@utils.arg('--max-column-width', metavar='<integer>', default=80,
+           help='The max column width of the printed table.')
 def do_image_show(gc, args):
     """Describe a specific image."""
     image_id = utils.find_resource(gc.images, args.image).id
     image = gc.images.get(image_id)
-    _image_show(image, args.human_readable)
+    _image_show(image, args.human_readable,
+                max_column_width=int(args.max_column_width))
 
 
 @utils.arg('--file', metavar='<FILE>',
@@ -162,12 +167,12 @@ def do_image_download(gc, args):
            help='Container format of image. ' + CONTAINER_FORMATS)
 @utils.arg('--owner', metavar='<TENANT_ID>',
            help='Tenant who should own image.')
-@utils.arg('--size', metavar='<SIZE>',
+@utils.arg('--size', metavar='<SIZE>', type=int,
            help=('Size of image data (in bytes). Only used with'
                  ' \'--location\' and \'--copy_from\'.'))
-@utils.arg('--min-disk', metavar='<DISK_GB>',
+@utils.arg('--min-disk', metavar='<DISK_GB>', type=int,
            help='Minimum size of disk needed to boot image (in gigabytes).')
-@utils.arg('--min-ram', metavar='<DISK_RAM>',
+@utils.arg('--min-ram', metavar='<DISK_RAM>', type=int,
            help='Minimum amount of ram needed to boot image (in megabytes).')
 @utils.arg('--location', metavar='<IMAGE_URL>',
            help=('URL where the data for this image already resides. For '
@@ -188,9 +193,11 @@ def do_image_download(gc, args):
 # to use --is-public
 @utils.arg('--public', action='store_true', default=False,
            help=argparse.SUPPRESS)
-@utils.arg('--is-public', type=utils.string_to_bool, metavar='{True,False}',
+@utils.arg('--is-public',
+           type=strutils.bool_from_string, metavar='{True,False}',
            help='Make image accessible to the public.')
-@utils.arg('--is-protected', type=utils.string_to_bool, metavar='{True,False}',
+@utils.arg('--is-protected',
+           type=strutils.bool_from_string, metavar='{True,False}',
            help='Prevent image from being deleted.')
 @utils.arg('--property', metavar="<key=value>", action='append', default=[],
            help=("Arbitrary property to associate with image. "
@@ -221,7 +228,8 @@ def do_image_create(gc, args):
 
     _set_data_field(fields, args)
 
-    if args.progress:
+    # Only show progress bar for local image files
+    if fields.get('data') and args.progress:
         filesize = utils.get_file_size(fields['data'])
         fields['data'] = progressbar.VerboseFileWrapper(
             fields['data'], filesize
@@ -240,11 +248,11 @@ def do_image_create(gc, args):
            help='Container format of image. ' + CONTAINER_FORMATS)
 @utils.arg('--owner', metavar='<TENANT_ID>',
            help='Tenant who should own image.')
-@utils.arg('--size', metavar='<SIZE>',
+@utils.arg('--size', metavar='<SIZE>', type=int,
            help='Size of image data (in bytes).')
-@utils.arg('--min-disk', metavar='<DISK_GB>',
+@utils.arg('--min-disk', metavar='<DISK_GB>', type=int,
            help='Minimum size of disk needed to boot image (in gigabytes).')
-@utils.arg('--min-ram', metavar='<DISK_RAM>',
+@utils.arg('--min-ram', metavar='<DISK_RAM>', type=int,
            help='Minimum amount of ram needed to boot image (in megabytes).')
 @utils.arg('--location', metavar='<IMAGE_URL>',
            help=('URL where the data for this image already resides. For '
@@ -260,9 +268,11 @@ def do_image_create(gc, args):
            help=('Similar to \'--location\' in usage, but this indicates that'
                  ' the Glance server should immediately copy the data and'
                  ' store it in its configured image store.'))
-@utils.arg('--is-public', type=utils.string_to_bool, metavar='{True,False}',
+@utils.arg('--is-public',
+           type=strutils.bool_from_string, metavar='{True,False}',
            help='Make image accessible to the public.')
-@utils.arg('--is-protected', type=utils.string_to_bool, metavar='{True,False}',
+@utils.arg('--is-protected',
+           type=strutils.bool_from_string, metavar='{True,False}',
            help='Prevent image from being deleted.')
 @utils.arg('--property', metavar="<key=value>", action='append', default=[],
            help=("Arbitrary property to associate with image. "
@@ -366,9 +376,9 @@ def do_member_create(gc, args):
 
 
 @utils.arg('image', metavar='<IMAGE>',
-           help='Image from which to remove member')
+           help='Image from which to remove member.')
 @utils.arg('tenant_id', metavar='<TENANT_ID>',
-           help='Tenant to remove as member')
+           help='Tenant to remove as member.')
 def do_member_delete(gc, args):
     """Remove a shared image from a tenant."""
     image_id = utils.find_resource(gc.images, args.image).id

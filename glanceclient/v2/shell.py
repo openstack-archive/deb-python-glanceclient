@@ -28,7 +28,7 @@ def get_image_schema():
     if IMAGE_SCHEMA is None:
         schema_path = expanduser("~/.glanceclient/image_schema.json")
         if os.path.exists(schema_path) and os.path.isfile(schema_path):
-            with file(schema_path, "r") as f:
+            with open(schema_path, "r") as f:
                 schema_raw = f.read()
                 IMAGE_SCHEMA = json.loads(schema_raw)
     return IMAGE_SCHEMA
@@ -53,19 +53,16 @@ def do_image_create(gc, args):
         fields[key] = value
 
     image = gc.images.create(**fields)
-    ignore = ['self', 'access', 'file', 'schema']
-    image = dict([item for item in image.iteritems()
-                  if item[0] not in ignore])
-    utils.print_dict(image)
+    utils.print_image(image)
 
 
 @utils.arg('id', metavar='<IMAGE_ID>', help='ID of image to update.')
-@utils.schema_args(get_image_schema, omit=['id'])
+@utils.schema_args(get_image_schema, omit=['id', 'locations'])
 @utils.arg('--property', metavar="<key=value>", action='append',
            default=[], help=('Arbitrary property to associate with image.'
                              ' May be used multiple times.'))
 @utils.arg('--remove-property', metavar="key", action='append', default=[],
-           help="Name of arbitrary property to remove from the image")
+           help="Name of arbitrary property to remove from the image.")
 def do_image_update(gc, args):
     """Update an existing image."""
     schema = gc.schemas.get("image")
@@ -84,10 +81,7 @@ def do_image_update(gc, args):
 
     image_id = fields.pop('id')
     image = gc.images.update(image_id, remove_properties, **fields)
-    ignore = ['self', 'access', 'file', 'schema']
-    image = dict([item for item in image.iteritems()
-                  if item[0] not in ignore])
-    utils.print_dict(image)
+    utils.print_image(image)
 
 
 @utils.arg('--page-size', metavar='<SIZE>', default=None, type=int,
@@ -99,9 +93,9 @@ def do_image_update(gc, args):
 @utils.arg('--owner', metavar='<OWNER>',
            help='Display images owned by <OWNER>.')
 @utils.arg('--checksum', metavar='<CHECKSUM>',
-           help='Display images matching the checksum')
+           help='Displays images that match the checksum.')
 @utils.arg('--tag', metavar='<TAG>', action='append',
-           help="Filter images by an user-defined tag.")
+           help="Filter images by a user-defined tag.")
 def do_image_list(gc, args):
     """List images you can access."""
     filter_keys = ['visibility', 'member_status', 'owner', 'checksum', 'tag']
@@ -118,12 +112,13 @@ def do_image_list(gc, args):
 
 
 @utils.arg('id', metavar='<IMAGE_ID>', help='ID of image to describe.')
+@utils.arg('--max-column-width', metavar='<integer>', default=80,
+           help='The max column width of the printed table.')
 def do_image_show(gc, args):
     """Describe a specific image."""
     image = gc.images.get(args.id)
     ignore = ['self', 'access', 'file', 'schema']
-    image = dict([item for item in image.iteritems() if item[0] not in ignore])
-    utils.print_dict(image)
+    utils.print_image(image, int(args.max_column_width))
 
 
 @utils.arg('--image-id', metavar='<IMAGE_ID>', required=True,
@@ -137,11 +132,11 @@ def do_member_list(gc, args):
 
 
 @utils.arg('image_id', metavar='<IMAGE_ID>',
-           help='Image from which to remove member')
+           help='Image from which to remove member.')
 @utils.arg('member_id', metavar='<MEMBER_ID>',
-           help='Tenant to remove as member')
+           help='Tenant to remove as member.')
 def do_member_delete(gc, args):
-    """Delete image member"""
+    """Delete image member."""
     if not (args.image_id and args.member_id):
         utils.exit('Unable to delete member. Specify image_id and member_id')
     else:
@@ -149,11 +144,11 @@ def do_member_delete(gc, args):
 
 
 @utils.arg('image_id', metavar='<IMAGE_ID>',
-           help='Image from which to update member')
+           help='Image from which to update member.')
 @utils.arg('member_id', metavar='<MEMBER_ID>',
-           help='Tenant to update')
+           help='Tenant to update.')
 @utils.arg('member_status', metavar='<MEMBER_STATUS>',
-           help='Updated status of member')
+           help='Updated status of member.')
 def do_member_update(gc, args):
     """Update the status of a member for a given image."""
     if not (args.image_id and args.member_id and args.member_status):
@@ -168,9 +163,9 @@ def do_member_update(gc, args):
 
 
 @utils.arg('image_id', metavar='<IMAGE_ID>',
-           help='Image on which to create member')
+           help='Image with which to create member.')
 @utils.arg('member_id', metavar='<MEMBER_ID>',
-           help='Tenant to add as member')
+           help='Tenant to add as member.')
 def do_member_create(gc, args):
     """Create member for a given image."""
     if not (args.image_id and args.member_id):
@@ -211,15 +206,25 @@ def do_image_download(gc, args):
 
 
 @utils.arg('--file', metavar='<FILE>',
-           help=('Local file that contains disk image to be uploaded'
-                 ' during creation. Alternatively, images can be passed'
+           help=('Local file that contains disk image to be uploaded.'
+                 ' Alternatively, images can be passed'
                  ' to the client via stdin.'))
+@utils.arg('--size', metavar='<IMAGE_SIZE>', type=int,
+           help='Size in bytes of image to be uploaded. Default is to get '
+                'size from provided data object but this is supported in case '
+                'where size cannot be inferred.',
+           default=None)
+@utils.arg('--progress', action='store_true', default=False,
+           help='Show upload progress bar.')
 @utils.arg('id', metavar='<IMAGE_ID>',
            help='ID of image to upload data to.')
 def do_image_upload(gc, args):
     """Upload data for a specific image."""
     image_data = utils.get_data_file(args)
-    gc.images.upload(args.id, image_data)
+    if args.progress:
+        filesize = utils.get_file_size(image_data)
+        image_data = progressbar.VerboseFileWrapper(image_data, filesize)
+    gc.images.upload(args.id, image_data, args.size)
 
 
 @utils.arg('id', metavar='<IMAGE_ID>', help='ID of image to delete.')
@@ -229,9 +234,9 @@ def do_image_delete(gc, args):
 
 
 @utils.arg('image_id', metavar='<IMAGE_ID>',
-           help='Image to be updated with the given tag')
+           help='Image to be updated with the given tag.')
 @utils.arg('tag_value', metavar='<TAG_VALUE>',
-           help='Value of the tag')
+           help='Value of the tag.')
 def do_image_tag_update(gc, args):
         """Update an image with the given tag."""
         if not (args.image_id and args.tag_value):
@@ -245,12 +250,57 @@ def do_image_tag_update(gc, args):
 
 
 @utils.arg('image_id', metavar='<IMAGE_ID>',
-           help='Image whose tag to be deleted')
+           help='ID of the image from which to delete tag.')
 @utils.arg('tag_value', metavar='<TAG_VALUE>',
-           help='Value of the tag')
+           help='Value of the tag.')
 def do_image_tag_delete(gc, args):
     """Delete the tag associated with the given image."""
     if not (args.image_id and args.tag_value):
         utils.exit('Unable to delete tag. Specify image_id and tag_value')
     else:
         gc.image_tags.delete(args.image_id, args.tag_value)
+
+
+@utils.arg('--url', metavar='<URL>', required=True,
+           help='URL of location to add.')
+@utils.arg('--metadata', metavar='<STRING>', default='{}',
+           help=('Metadata associated with the location. '
+                 'Must be a valid JSON object (default: %(default)s)'))
+@utils.arg('id', metavar='<ID>',
+           help='ID of image to which the location is to be added.')
+def do_location_add(gc, args):
+    """Add a location (and related metadata) to an image."""
+    try:
+        metadata = json.loads(args.metadata)
+    except ValueError:
+        utils.exit('Metadata is not a valid JSON object.')
+    else:
+        image = gc.images.add_location(args.id, args.url, metadata)
+        utils.print_dict(image)
+
+
+@utils.arg('--url', metavar='<URL>', action='append', required=True,
+           help='URL of location to remove. May be used multiple times.')
+@utils.arg('id', metavar='<ID>',
+           help='ID of image whose locations are to be removed.')
+def do_location_delete(gc, args):
+    """Remove locations (and related metadata) from an image."""
+    image = gc.images.delete_locations(args.id, set(args.url))
+
+
+@utils.arg('--url', metavar='<URL>', required=True,
+           help='URL of location to update.')
+@utils.arg('--metadata', metavar='<STRING>', default='{}',
+           help=('Metadata associated with the location. '
+                 'Must be a valid JSON object (default: %(default)s)'))
+@utils.arg('id', metavar='<ID>',
+           help='ID of image whose location is to be updated.')
+def do_location_update(gc, args):
+    """Update metadata of an image's location."""
+    try:
+        metadata = json.loads(args.metadata)
+    except ValueError:
+        utils.exit('Metadata is not a valid JSON object.')
+    else:
+        image = gc.images.update_location(args.id, args.url, metadata)
+        utils.print_dict(image)

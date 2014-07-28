@@ -13,7 +13,6 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 import mock
 import testtools
@@ -27,7 +26,9 @@ class LegacyShellV1Test(testtools.TestCase):
     def test_print_image_formatted(self):
 
         class FakeClient():
-            endpoint = 'http://is.invalid'
+            class FakeHTTPClient():
+                endpoint = 'http://is.invalid'
+            http_client = FakeHTTPClient()
 
         class FakeImage():
             id = 1

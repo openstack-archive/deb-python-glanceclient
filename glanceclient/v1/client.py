@@ -14,11 +14,12 @@
 #    under the License.
 
 from glanceclient.common import http
-from glanceclient.v1 import images
+from glanceclient.common import utils
 from glanceclient.v1 import image_members
+from glanceclient.v1 import images
 
 
-class Client(http.HTTPClient):
+class Client(object):
     """Client for the OpenStack Images v1 API.
 
     :param string endpoint: A user-supplied endpoint URL for the glance
@@ -28,8 +29,9 @@ class Client(http.HTTPClient):
                             http requests. (optional)
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, endpoint, *args, **kwargs):
         """Initialize a new client for the Images v1 API."""
-        super(Client, self).__init__(*args, **kwargs)
-        self.images = images.ImageManager(self)
-        self.image_members = image_members.ImageMemberManager(self)
+        self.http_client = http.HTTPClient(utils.strip_version(endpoint),
+                                           *args, **kwargs)
+        self.images = images.ImageManager(self.http_client)
+        self.image_members = image_members.ImageMemberManager(self.http_client)

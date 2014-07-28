@@ -15,10 +15,12 @@
 
 import copy
 import json
-import urllib
 
-from glanceclient.common import base
+import six
+from six.moves.urllib import parse
+
 from glanceclient.common import utils
+from glanceclient.openstack.common.apiclient import base
 from glanceclient.openstack.common import strutils
 
 UPDATE_PARAMS = ('name', 'disk_format', 'container_format', 'min_disk',
@@ -37,6 +39,8 @@ SORT_DIR_VALUES = ('asc', 'desc')
 SORT_KEY_VALUES = ('name', 'status', 'container_format', 'disk_format',
                    'size', 'id', 'created_at', 'updated_at')
 
+OS_REQ_ID_HDR = 'x-openstack-request-id'
+
 
 class Image(base.Resource):
     def __repr__(self):
@@ -45,20 +49,30 @@ class Image(base.Resource):
     def update(self, **fields):
         self.manager.update(self, **fields)
 
-    def delete(self):
+    def delete(self, **kwargs):
         return self.manager.delete(self)
 
     def data(self, **kwargs):
         return self.manager.data(self, **kwargs)
 
 
-class ImageManager(base.Manager):
+class ImageManager(base.ManagerWithFind):
     resource_class = Image
+
+    def _list(self, url, response_key, obj_class=None, body=None):
+        resp = self.client.get(url)
+
+        if obj_class is None:
+            obj_class = self.resource_class
+
+        data = resp.json()[response_key]
+        return ([obj_class(self, res, loaded=True) for res in data if res],
+                resp)
 
     def _image_meta_from_headers(self, headers):
         meta = {'properties': {}}
         safe_decode = strutils.safe_decode
-        for key, value in headers.iteritems():
+        for key, value in six.iteritems(headers):
             value = safe_decode(value, incoming='utf-8')
             if key.startswith('x-image-meta-property-'):
                 _key = safe_decode(key[22:], incoming='utf-8')
@@ -69,7 +83,7 @@ class ImageManager(base.Manager):
 
         for key in ['is_public', 'protected', 'deleted']:
             if key in meta:
-                meta[key] = utils.string_to_bool(meta[key])
+                meta[key] = strutils.bool_from_string(meta[key])
 
         return self._format_image_meta_for_user(meta)
 
@@ -82,13 +96,13 @@ class ImageManager(base.Manager):
         # headers will be encoded later, before the
         # request is sent.
         def to_str(value):
-            if not isinstance(value, basestring):
+            if not isinstance(value, six.string_types):
                 return str(value)
             return value
 
-        for key, value in fields_copy.pop('properties', {}).iteritems():
+        for key, value in six.iteritems(fields_copy.pop('properties', {})):
             headers['x-image-meta-property-%s' % key] = to_str(value)
-        for key, value in fields_copy.iteritems():
+        for key, value in six.iteritems(fields_copy):
             headers['x-image-meta-%s' % key] = to_str(value)
         return headers
 
@@ -97,25 +111,28 @@ class ImageManager(base.Manager):
         for key in ['size', 'min_ram', 'min_disk']:
             if key in meta:
                 try:
-                    meta[key] = int(meta[key])
+                    meta[key] = int(meta[key]) if meta[key] else 0
                 except ValueError:
                     pass
         return meta
 
-    def get(self, image):
+    def get(self, image, **kwargs):
         """Get the metadata for a specific image.
 
         :param image: image object or id to look up
         :rtype: :class:`Image`
         """
-
         image_id = base.getid(image)
-        resp, body = self.api.raw_request('HEAD', '/v1/images/%s'
-                                          % urllib.quote(str(image_id)))
+        resp, body = self.client.raw_request(
+            'HEAD', '/v1/images/%s' % parse.quote(str(image_id)))
         meta = self._image_meta_from_headers(dict(resp.getheaders()))
+        return_request_id = kwargs.get('return_req_id', None)
+        if return_request_id is not None:
+            return_request_id.append(resp.getheader(OS_REQ_ID_HDR, None))
+
         return Image(self, meta)
 
-    def data(self, image, do_checksum=True):
+    def data(self, image, do_checksum=True, **kwargs):
         """Get the raw data for a specific image.
 
         :param image: image object or id to look up
@@ -123,11 +140,15 @@ class ImageManager(base.Manager):
         :rtype: iterable containing image data
         """
         image_id = base.getid(image)
-        resp, body = self.api.raw_request('GET', '/v1/images/%s'
-                                          % urllib.quote(str(image_id)))
+        resp, body = self.client.raw_request(
+            'GET', '/v1/images/%s' % parse.quote(str(image_id)))
         checksum = resp.getheader('x-image-meta-checksum', None)
         if do_checksum and checksum is not None:
             body.set_checksum(checksum)
+        return_request_id = kwargs.get('return_req_id', None)
+        if return_request_id is not None:
+            return_request_id.append(resp.getheader(OS_REQ_ID_HDR, None))
+
         return body
 
     def list(self, **kwargs):
@@ -142,11 +163,14 @@ class ImageManager(base.Manager):
         :param owner: If provided, only images with this owner (tenant id)
                       will be listed. An empty string ('') matches ownerless
                       images.
+        :param return_request_id: If an empty list is provided, populate this
+                              list with the request ID value from the header
+                              x-openstack-request-id
         :rtype: list of :class:`Image`
         """
         absolute_limit = kwargs.get('limit')
 
-        def paginate(qp, seen=0):
+        def paginate(qp, seen=0, return_request_id=None):
             def filter_owner(owner, image):
                 # If client side owner 'filter' is specified
                 # only return images that match 'owner'.
@@ -160,8 +184,8 @@ class ImageManager(base.Manager):
                     return not (image.owner == owner)
 
             owner = qp.pop('owner', None)
-            for param, value in qp.iteritems():
-                if isinstance(value, basestring):
+            for param, value in six.iteritems(qp):
+                if isinstance(value, six.string_types):
                     # Note(flaper87) Url encoding should
                     # be moved inside http utils, at least
                     # shouldn't be here.
@@ -170,8 +194,12 @@ class ImageManager(base.Manager):
                     # trying to encode them
                     qp[param] = strutils.safe_encode(value)
 
-            url = '/v1/images/detail?%s' % urllib.urlencode(qp)
-            images = self._list(url, "images")
+            url = '/v1/images/detail?%s' % parse.urlencode(qp)
+            images, resp = self._list(url, "images")
+
+            if return_request_id is not None:
+                return_request_id.append(resp.getheader(OS_REQ_ID_HDR, None))
+
             for image in images:
                 if filter_owner(owner, image):
                     continue
@@ -184,7 +212,7 @@ class ImageManager(base.Manager):
             if (page_size and len(images) == page_size and
                     (absolute_limit is None or 0 < seen < absolute_limit)):
                 qp['marker'] = image.id
-                for image in paginate(qp, seen):
+                for image in paginate(qp, seen, return_request_id):
                     yield image
 
         params = {'limit': kwargs.get('page_size', DEFAULT_PAGE_SIZE)}
@@ -219,11 +247,16 @@ class ImageManager(base.Manager):
         if 'is_public' in kwargs:
             params['is_public'] = kwargs['is_public']
 
-        return paginate(params)
+        return_request_id = kwargs.get('return_req_id', None)
 
-    def delete(self, image):
+        return paginate(params, 0, return_request_id)
+
+    def delete(self, image, **kwargs):
         """Delete an image."""
-        self._delete("/v1/images/%s" % base.getid(image))
+        resp = self._delete("/v1/images/%s" % base.getid(image))[0]
+        return_request_id = kwargs.get('return_req_id', None)
+        if return_request_id is not None:
+            return_request_id.append(resp.getheader(OS_REQ_ID_HDR, None))
 
     def create(self, **kwargs):
         """Create an image
@@ -240,6 +273,8 @@ class ImageManager(base.Manager):
         for field in kwargs:
             if field in CREATE_PARAMS:
                 fields[field] = kwargs[field]
+            elif field == 'return_req_id':
+                continue
             else:
                 msg = 'create() got an unexpected keyword argument \'%s\''
                 raise TypeError(msg % field)
@@ -249,9 +284,13 @@ class ImageManager(base.Manager):
         if copy_from is not None:
             hdrs['x-glance-api-copy-from'] = copy_from
 
-        resp, body_iter = self.api.raw_request(
+        resp, body_iter = self.client.raw_request(
             'POST', '/v1/images', headers=hdrs, body=image_data)
         body = json.loads(''.join([c for c in body_iter]))
+        return_request_id = kwargs.get('return_req_id', None)
+        if return_request_id is not None:
+            return_request_id.append(resp.getheader(OS_REQ_ID_HDR, None))
+
         return Image(self, self._format_image_meta_for_user(body['image']))
 
     def update(self, image, **kwargs):
@@ -266,17 +305,18 @@ class ImageManager(base.Manager):
                 kwargs.setdefault('size', image_size)
 
         hdrs = {}
-        try:
-            purge_props = 'true' if kwargs.pop('purge_props') else 'false'
-        except KeyError:
-            pass
-        else:
-            hdrs['x-glance-registry-purge-props'] = purge_props
+        purge_props = 'false'
+        purge_props_bool = kwargs.pop('purge_props', None)
+        if purge_props_bool:
+            purge_props = 'true'
 
+        hdrs['x-glance-registry-purge-props'] = purge_props
         fields = {}
         for field in kwargs:
             if field in UPDATE_PARAMS:
                 fields[field] = kwargs[field]
+            elif field == 'return_req_id':
+                continue
             else:
                 msg = 'update() got an unexpected keyword argument \'%s\''
                 raise TypeError(msg % field)
@@ -287,7 +327,11 @@ class ImageManager(base.Manager):
             hdrs['x-glance-api-copy-from'] = copy_from
 
         url = '/v1/images/%s' % base.getid(image)
-        resp, body_iter = self.api.raw_request(
+        resp, body_iter = self.client.raw_request(
             'PUT', url, headers=hdrs, body=image_data)
         body = json.loads(''.join([c for c in body_iter]))
+        return_request_id = kwargs.get('return_req_id', None)
+        if return_request_id is not None:
+            return_request_id.append(resp.getheader(OS_REQ_ID_HDR, None))
+
         return Image(self, self._format_image_meta_for_user(body['image']))

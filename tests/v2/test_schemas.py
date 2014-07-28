@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from jsonpatch import JsonPatch
 import testtools
 import warlock
 
@@ -53,34 +54,39 @@ _SCHEMA = schemas.Schema({
 })
 
 
+def compare_json_patches(a, b):
+    """Return 0 if a and b describe the same JSON patch."""
+    return JsonPatch.from_string(a) == JsonPatch.from_string(b)
+
+
 class TestSchemaProperty(testtools.TestCase):
     def test_property_minimum(self):
         prop = schemas.SchemaProperty('size')
-        self.assertEqual(prop.name, 'size')
+        self.assertEqual('size', prop.name)
 
     def test_property_description(self):
         prop = schemas.SchemaProperty('size', description='some quantity')
-        self.assertEqual(prop.name, 'size')
-        self.assertEqual(prop.description, 'some quantity')
+        self.assertEqual('size', prop.name)
+        self.assertEqual('some quantity', prop.description)
 
 
 class TestSchema(testtools.TestCase):
     def test_schema_minimum(self):
         raw_schema = {'name': 'Country', 'properties': {}}
         schema = schemas.Schema(raw_schema)
-        self.assertEqual(schema.name, 'Country')
-        self.assertEqual(schema.properties, [])
+        self.assertEqual('Country', schema.name)
+        self.assertEqual([], schema.properties)
 
     def test_schema_with_property(self):
         raw_schema = {'name': 'Country', 'properties': {'size': {}}}
         schema = schemas.Schema(raw_schema)
-        self.assertEqual(schema.name, 'Country')
-        self.assertEqual([p.name for p in schema.properties], ['size'])
+        self.assertEqual('Country', schema.name)
+        self.assertEqual(['size'], [p.name for p in schema.properties])
 
     def test_raw(self):
         raw_schema = {'name': 'Country', 'properties': {}}
         schema = schemas.Schema(raw_schema)
-        self.assertEqual(schema.raw(), raw_schema)
+        self.assertEqual(raw_schema, schema.raw())
 
 
 class TestController(testtools.TestCase):
@@ -91,8 +97,8 @@ class TestController(testtools.TestCase):
 
     def test_get_schema(self):
         schema = self.controller.get('image')
-        self.assertEqual(schema.name, 'image')
-        self.assertEqual([p.name for p in schema.properties], ['name'])
+        self.assertEqual('image', schema.name)
+        self.assertEqual(['name'], [p.name for p in schema.properties])
 
 
 class TestSchemaBasedModel(testtools.TestCase):
@@ -111,7 +117,7 @@ class TestSchemaBasedModel(testtools.TestCase):
 
         patch = original.patch
         expected = '[{"path": "/color", "value": "red", "op": "replace"}]'
-        self.assertEqual(patch, expected)
+        self.assertTrue(compare_json_patches(patch, expected))
 
     def test_patch_should_add_extra_properties(self):
         obj = {
@@ -123,7 +129,7 @@ class TestSchemaBasedModel(testtools.TestCase):
 
         patch = original.patch
         expected = '[{"path": "/weight", "value": "10", "op": "add"}]'
-        self.assertEqual(patch, expected)
+        self.assertTrue(compare_json_patches(patch, expected))
 
     def test_patch_should_replace_extra_properties(self):
         obj = {
@@ -136,7 +142,7 @@ class TestSchemaBasedModel(testtools.TestCase):
 
         patch = original.patch
         expected = '[{"path": "/weight", "value": "22", "op": "replace"}]'
-        self.assertEqual(patch, expected)
+        self.assertTrue(compare_json_patches(patch, expected))
 
     def test_patch_should_remove_extra_properties(self):
         obj = {
@@ -149,7 +155,7 @@ class TestSchemaBasedModel(testtools.TestCase):
 
         patch = original.patch
         expected = '[{"path": "/weight", "op": "remove"}]'
-        self.assertEqual(patch, expected)
+        self.assertTrue(compare_json_patches(patch, expected))
 
     def test_patch_should_remove_core_properties(self):
         obj = {
@@ -162,4 +168,5 @@ class TestSchemaBasedModel(testtools.TestCase):
 
         patch = original.patch
         expected = '[{"path": "/color", "op": "remove"}]'
-        self.assertEqual(patch, expected)
+        self.assertTrue(compare_json_patches(patch, expected))
+        self.assertEqual(expected, patch)

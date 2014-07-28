@@ -22,9 +22,11 @@ from __future__ import print_function
 
 import argparse
 import sys
-import urlparse
+
+from six.moves.urllib import parse
 
 from glanceclient.common import utils
+from glanceclient.openstack.common import strutils
 
 
 SUCCESS = 0
@@ -75,7 +77,7 @@ def print_image_formatted(client, image):
     :param client: The Glance client object
     :param image: The image metadata
     """
-    uri_parts = urlparse.urlparse(client.endpoint)
+    uri_parts = parse.urlparse(client.http_client.endpoint)
     if uri_parts.port:
         hostbase = "%s:%s" % (uri_parts.hostname, uri_parts.port)
     else:
@@ -115,9 +117,9 @@ def do_add(gc, args):
         return FAILURE
 
     image_meta = {
-        'is_public': utils.string_to_bool(
+        'is_public': strutils.bool_from_string(
             fields.pop('is_public', 'False')),
-        'protected': utils.string_to_bool(
+        'protected': strutils.bool_from_string(
             fields.pop('protected', 'False')),
         'min_disk': fields.pop('min_disk', 0),
         'min_ram': fields.pop('min_ram', 0),
@@ -208,9 +210,11 @@ def do_update(gc, args):
 
     # Have to handle "boolean" values specially...
     if 'is_public' in fields:
-        image_meta['is_public'] = utils.string_to_bool(fields.pop('is_public'))
+        image_meta['is_public'] = strutils.\
+            bool_from_string(fields.pop('is_public'))
     if 'protected' in fields:
-        image_meta['protected'] = utils.string_to_bool(fields.pop('protected'))
+        image_meta['protected'] = strutils.\
+            bool_from_string(fields.pop('protected'))
 
     # Add custom attributes, which are all the arguments remaining
     image_meta['properties'] = fields
@@ -269,9 +273,9 @@ def _get_images(gc, args):
 
 
 @utils.arg('--limit', dest="limit", metavar="LIMIT", default=10,
-           type=int, help="Page size to use while requesting image metadata")
+           type=int, help="Page size for image metadata requests.")
 @utils.arg('--marker', dest="marker", metavar="MARKER",
-           default=None, help="Image index after which to begin pagination")
+           default=None, help="Image index after which to begin pagination.")
 @utils.arg('--sort_key', dest="sort_key", metavar="KEY",
            help="Sort results by this image attribute.")
 @utils.arg('--sort_dir', dest="sort_dir", metavar="[desc|asc]",
@@ -302,9 +306,9 @@ def do_index(gc, args):
 
 
 @utils.arg('--limit', dest="limit", metavar="LIMIT", default=10,
-           type=int, help="Page size to use while requesting image metadata")
+           type=int, help="Page size for image metadata requests.")
 @utils.arg('--marker', dest="marker", metavar="MARKER",
-           default=None, help="Image index after which to begin pagination")
+           default=None, help="Image index after which to begin pagination.")
 @utils.arg('--sort_key', dest="sort_key", metavar="KEY",
            help="Sort results by this image attribute.")
 @utils.arg('--sort_dir', dest="sort_dir", metavar="[desc|asc]",

@@ -14,8 +14,8 @@
 #    under the License.
 
 import sys
-import StringIO
 
+import six
 import testtools
 
 from glanceclient.common import progressbar
@@ -32,17 +32,17 @@ class TestProgressBarWrapper(testtools.TestCase):
             sys.stdout = output = test_utils.FakeTTYStdout()
             # Consume iterator.
             data = list(progressbar.VerboseIteratorWrapper(iterator, size))
-            self.assertEqual(data, ['X'] * 100)
+            self.assertEqual(['X'] * 100, data)
             self.assertEqual(
-                output.getvalue().strip(),
-                '[%s>] 100%%' % ('=' * 29)
+                '[%s>] 100%%\n' % ('=' * 29),
+                output.getvalue()
             )
         finally:
             sys.stdout = saved_stdout
 
     def test_iter_file_display_progress_bar(self):
         size = 98304
-        file_obj = StringIO.StringIO('X' * size)
+        file_obj = six.StringIO('X' * size)
         saved_stdout = sys.stdout
         try:
             sys.stdout = output = test_utils.FakeTTYStdout()
@@ -52,8 +52,24 @@ class TestProgressBarWrapper(testtools.TestCase):
             while chunk:
                 chunk = file_obj.read(chunksize)
             self.assertEqual(
-                output.getvalue().strip(),
-                '[%s>] 100%%' % ('=' * 29)
+                '[%s>] 100%%\n' % ('=' * 29),
+                output.getvalue()
             )
+        finally:
+            sys.stdout = saved_stdout
+
+    def test_iter_file_no_tty(self):
+        size = 98304
+        file_obj = six.StringIO('X' * size)
+        saved_stdout = sys.stdout
+        try:
+            sys.stdout = output = test_utils.FakeNoTTYStdout()
+            file_obj = progressbar.VerboseFileWrapper(file_obj, size)
+            chunksize = 1024
+            chunk = file_obj.read(chunksize)
+            while chunk:
+                chunk = file_obj.read(chunksize)
+            # If stdout is not a tty progress bar should do nothing.
+            self.assertEqual('', output.getvalue())
         finally:
             sys.stdout = saved_stdout

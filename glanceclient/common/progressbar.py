@@ -15,6 +15,8 @@
 
 import sys
 
+import six
+
 
 class _ProgressBarBase(object):
     """
@@ -58,8 +60,10 @@ class VerboseFileWrapper(_ProgressBarBase):
         if data:
             self._display_progress_bar(len(data))
         else:
-            # Break to a new line from the progress bar for incoming output.
-            sys.stdout.write('\n')
+            if self._show_progress:
+                # Break to a new line from the progress bar for incoming
+                # output.
+                sys.stdout.write('\n')
         return data
 
 
@@ -76,12 +80,17 @@ class VerboseIteratorWrapper(_ProgressBarBase):
 
     def next(self):
         try:
-            data = self._wrapped.next()
+            data = six.next(self._wrapped)
             # NOTE(mouad): Assuming that data is a string b/c otherwise calling
             # len function will not make any sense.
             self._display_progress_bar(len(data))
             return data
         except StopIteration:
-            # Break to a new line from the progress bar for incoming output.
-            sys.stdout.write('\n')
+            if self._show_progress:
+                # Break to a new line from the progress bar for incoming
+                # output.
+                sys.stdout.write('\n')
             raise
+
+    # In Python 3, __next__() has replaced next().
+    __next__ = next

@@ -14,8 +14,8 @@
 #    under the License.
 
 import sys
-import StringIO
 
+import six
 import testtools
 
 from glanceclient.common import utils
@@ -32,22 +32,22 @@ class TestUtils(testtools.TestCase):
 
     def test_get_new_file_size(self):
         size = 98304
-        file_obj = StringIO.StringIO('X' * size)
+        file_obj = six.StringIO('X' * size)
         try:
-            self.assertEqual(utils.get_file_size(file_obj), size)
+            self.assertEqual(size, utils.get_file_size(file_obj))
             # Check that get_file_size didn't change original file position.
-            self.assertEqual(file_obj.tell(), 0)
+            self.assertEqual(0, file_obj.tell())
         finally:
             file_obj.close()
 
     def test_get_consumed_file_size(self):
         size, consumed = 98304, 304
-        file_obj = StringIO.StringIO('X' * size)
+        file_obj = six.StringIO('X' * size)
         file_obj.seek(consumed)
         try:
-            self.assertEqual(utils.get_file_size(file_obj), size)
+            self.assertEqual(size, utils.get_file_size(file_obj))
             # Check that get_file_size didn't change original file position.
-            self.assertEqual(file_obj.tell(), consumed)
+            self.assertEqual(consumed, file_obj.tell())
         finally:
             file_obj.close()
 
@@ -64,16 +64,20 @@ class TestUtils(testtools.TestCase):
 
         saved_stdout = sys.stdout
         try:
-            sys.stdout = output_list = StringIO.StringIO()
+            sys.stdout = output_list = six.StringIO()
             utils.print_list(images, columns)
 
-            sys.stdout = output_dict = StringIO.StringIO()
-            utils.print_dict({'K': 'k', 'Key': 'Value'})
+            sys.stdout = output_dict = six.StringIO()
+            utils.print_dict({'K': 'k', 'Key': 'veeeeeeeeeeeeeeeeeeeeeeee'
+                              'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+                              'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+                              'eeeeeeeeeeeery long value'},
+                             max_column_width=60)
 
         finally:
             sys.stdout = saved_stdout
 
-        self.assertEqual(output_list.getvalue(), '''\
+        self.assertEqual('''\
 +-------+--------------+
 | ID    | Name         |
 +-------+--------------+
@@ -81,16 +85,20 @@ class TestUtils(testtools.TestCase):
 | 1     | another      |
 | 65536 | veeeery long |
 +-------+--------------+
-''')
+''',
+                         output_list.getvalue())
 
-        self.assertEqual(output_dict.getvalue(), '''\
-+----------+-------+
-| Property | Value |
-+----------+-------+
-| K        | k     |
-| Key      | Value |
-+----------+-------+
-''')
+        self.assertEqual('''\
++----------+--------------------------------------------------------------+
+| Property | Value                                                        |
++----------+--------------------------------------------------------------+
+| K        | k                                                            |
+| Key      | veeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee |
+|          | eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee |
+|          | ery long value                                               |
++----------+--------------------------------------------------------------+
+''',
+                         output_dict.getvalue())
 
     def test_exception_to_str(self):
         class FakeException(Exception):
@@ -98,11 +106,14 @@ class TestUtils(testtools.TestCase):
                 raise UnicodeError()
 
         ret = utils.exception_to_str(Exception('error message'))
-        self.assertEqual(ret, 'error message')
+        self.assertEqual('error message', ret)
 
         ret = utils.exception_to_str(Exception('\xa5 error message'))
-        self.assertEqual(ret, ' error message')
+        if six.PY2:
+            self.assertEqual(' error message', ret)
+        else:
+            self.assertEqual('\xa5 error message', ret)
 
         ret = utils.exception_to_str(FakeException('\xa5 error message'))
-        self.assertEqual(ret, "Caught '%(exception)s' exception." %
-                         {'exception': 'FakeException'})
+        self.assertEqual("Caught '%(exception)s' exception." %
+                         {'exception': 'FakeException'}, ret)

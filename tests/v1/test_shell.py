@@ -13,11 +13,11 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 import argparse
 import json
 import os
+import six
 import subprocess
 import tempfile
 import testtools
@@ -30,6 +30,12 @@ import glanceclient.v1.images
 import glanceclient.v1.shell as v1shell
 
 from tests import utils
+
+if six.PY3:
+    import io
+    file_type = io.IOBase
+else:
+    file_type = file
 
 fixtures = {
     '/v1/images/96d2c7e1-de4e-4612-8aa2-ba26610c804e': {
@@ -183,12 +189,12 @@ fixtures = {
 }
 
 
-class ShellInvalidEndpointTest(utils.TestCase):
+class ShellInvalidEndpointandParameterTest(utils.TestCase):
 
     # Patch os.environ to avoid required auth info.
     def setUp(self):
         """Run before each test."""
-        super(ShellInvalidEndpointTest, self).setUp()
+        super(ShellInvalidEndpointandParameterTest, self).setUp()
         self.old_environment = os.environ.copy()
         os.environ = {
             'OS_USERNAME': 'username',
@@ -204,7 +210,7 @@ class ShellInvalidEndpointTest(utils.TestCase):
         self.shell = shell.OpenStackImagesShell()
 
     def tearDown(self):
-        super(ShellInvalidEndpointTest, self).tearDown()
+        super(ShellInvalidEndpointandParameterTest, self).tearDown()
         os.environ = self.old_environment
 
     def run_command(self, cmd):
@@ -295,6 +301,46 @@ class ShellInvalidEndpointTest(utils.TestCase):
             exc.InvalidEndpoint,
             self.run_command,
             'member-add  <IMAGE_ID> <TENANT_ID>')
+
+    def test_image_create_invalid_size_parameter(self):
+        self.assertRaises(
+            SystemExit,
+            self.run_command, 'image-create --size 10gb')
+
+    def test_image_create_invalid_ram_parameter(self):
+        self.assertRaises(
+            SystemExit,
+            self.run_command, 'image-create --min-ram 10gb')
+
+    def test_image_create_invalid_min_disk_parameter(self):
+        self.assertRaises(
+            SystemExit,
+            self.run_command, 'image-create --min-disk 10gb')
+
+    def test_image_update_invalid_size_parameter(self):
+        self.assertRaises(
+            SystemExit,
+            self.run_command, 'image-update --size 10gb')
+
+    def test_image_update_invalid_min_disk_parameter(self):
+        self.assertRaises(
+            SystemExit,
+            self.run_command, 'image-update --min-disk 10gb')
+
+    def test_image_update_invalid_ram_parameter(self):
+        self.assertRaises(
+            SystemExit,
+            self.run_command, 'image-update --min-ram 10gb')
+
+    def test_image_list_invalid_min_size_parameter(self):
+        self.assertRaises(
+            SystemExit,
+            self.run_command, 'image-list --size-min 10gb')
+
+    def test_image_list_invalid_max_size_parameter(self):
+        self.assertRaises(
+            SystemExit,
+            self.run_command, 'image-list --size-max 10gb')
 
 
 class ShellStdinHandlingTests(testtools.TestCase):
@@ -403,9 +449,9 @@ class ShellStdinHandlingTests(testtools.TestCase):
             self._do_update('44d2c7e1-de4e-4612-8aa2-ba26610c444f')
 
             self.assertTrue('data' in self.collected_args[1])
-            self.assertIsInstance(self.collected_args[1]['data'], file)
-            self.assertEqual(self.collected_args[1]['data'].read(),
-                             'Some Data')
+            self.assertIsInstance(self.collected_args[1]['data'], file_type)
+            self.assertEqual('Some Data',
+                             self.collected_args[1]['data'].read())
 
         finally:
             try:
@@ -428,9 +474,9 @@ class ShellStdinHandlingTests(testtools.TestCase):
             self._do_update('44d2c7e1-de4e-4612-8aa2-ba26610c444f')
 
             self.assertTrue('data' in self.collected_args[1])
-            self.assertIsInstance(self.collected_args[1]['data'], file)
-            self.assertEqual(self.collected_args[1]['data'].read(),
-                             'Some Data\n')
+            self.assertIsInstance(self.collected_args[1]['data'], file_type)
+            self.assertEqual('Some Data\n',
+                             self.collected_args[1]['data'].read())
 
         finally:
             try:

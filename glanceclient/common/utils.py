@@ -17,8 +17,11 @@ from __future__ import print_function
 
 import errno
 import os
+import re
 import sys
 import uuid
+
+import six
 
 if os.name == 'nt':
     import msvcrt
@@ -46,7 +49,7 @@ def schema_args(schema_getter, omit=[]):
     typemap = {
         'string': str,
         'integer': int,
-        'boolean': string_to_bool,
+        'boolean': strutils.bool_from_string,
         'array': list
     }
 
@@ -63,7 +66,7 @@ def schema_args(schema_getter, omit=[]):
                                                                  kwargs))
         else:
             properties = schema.get('properties', {})
-            for name, property in properties.iteritems():
+            for name, property in six.iteritems(properties):
                 if name in omit:
                     continue
                 param = '--' + name.replace('_', '-')
@@ -119,10 +122,11 @@ def print_list(objs, fields, formatters={}):
     print(strutils.safe_encode(pt.get_string()))
 
 
-def print_dict(d):
+def print_dict(d, max_column_width=80):
     pt = prettytable.PrettyTable(['Property', 'Value'], caching=False)
     pt.align = 'l'
-    [pt.add_row(list(r)) for r in d.iteritems()]
+    pt.max_width = max_column_width
+    [pt.add_row(list(r)) for r in six.iteritems(d)]
     print(strutils.safe_encode(pt.get_string(sortby='Property')))
 
 
@@ -171,10 +175,6 @@ def is_authentication_required(f):
     skip the authentication step.
     """
     return getattr(f, 'require_authentication', True)
-
-
-def string_to_bool(arg):
-    return arg.strip().lower() in ('t', 'true', 'yes', '1')
 
 
 def env(*vars, **kwargs):
@@ -250,7 +250,7 @@ def getsockopt(self, *args, **kwargs):
 
 def exception_to_str(exc):
     try:
-        error = unicode(exc)
+        error = six.text_type(exc)
     except UnicodeError:
         try:
             error = str(exc)
@@ -267,7 +267,8 @@ def get_file_size(file_obj):
     :param file_obj: file-like object.
     :retval The file's size or None if it cannot be determined.
     """
-    if hasattr(file_obj, 'seek') and hasattr(file_obj, 'tell'):
+    if (hasattr(file_obj, 'seek') and hasattr(file_obj, 'tell') and
+            (six.PY2 or six.PY3 and file_obj.seekable())):
         try:
             curr = file_obj.tell()
             file_obj.seek(0, os.SEEK_END)
@@ -277,7 +278,7 @@ def get_file_size(file_obj):
         except IOError as e:
             if e.errno == errno.ESPIPE:
                 # Illegal seek. This means the file object
-                # is a pipe (e.g the user is trying
+                # is a pipe (e.g. the user is trying
                 # to pipe image data to the client,
                 # echo testdata | bin/glance add blah...), or
                 # that file object is empty, or that a file-like
@@ -312,3 +313,25 @@ def get_data_file(args):
         else:
             # (3) no image data provided
             return None
+
+
+def strip_version(endpoint):
+    """Strip version from the last component of endpoint if present."""
+    # Get rid of trailing '/' if present
+    if endpoint.endswith('/'):
+        endpoint = endpoint[:-1]
+    url_bits = endpoint.split('/')
+    # regex to match 'v1' or 'v2.0' etc
+    if re.match('v\d+\.?\d*', url_bits[-1]):
+        endpoint = '/'.join(url_bits[:-1])
+    return endpoint
+
+
+def print_image(image_obj, max_col_width=None):
+    ignore = ['self', 'access', 'file', 'schema']
+    image = dict([item for item in six.iteritems(image_obj)
+                  if item[0] not in ignore])
+    if str(max_col_width).isdigit():
+        print_dict(image, max_column_width=max_col_width)
+    else:
+        print_dict(image)

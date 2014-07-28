@@ -13,10 +13,14 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import urllib
+import json
+import six
+from six.moves.urllib import parse
 
 import warlock
 
+from glanceclient.common import utils
+from glanceclient import exc
 from glanceclient.openstack.common import strutils
 
 DEFAULT_PAGE_SIZE = 20
@@ -56,17 +60,17 @@ class Controller(object):
         tags_url_params = []
 
         for tag in tags:
-            if isinstance(tag, basestring):
+            if isinstance(tag, six.string_types):
                 tags_url_params.append({'tag': strutils.safe_encode(tag)})
 
-        for param, value in filters.iteritems():
-            if isinstance(value, basestring):
+        for param, value in six.iteritems(filters):
+            if isinstance(value, six.string_types):
                 filters[param] = strutils.safe_encode(value)
 
-        url = '/v2/images?%s' % urllib.urlencode(filters)
+        url = '/v2/images?%s' % parse.urlencode(filters)
 
         for param in tags_url_params:
-            url = '%s&%s' % (url, urllib.urlencode(param))
+            url = '%s&%s' % (url, parse.urlencode(param))
 
         for image in paginate(url):
             #NOTE(bcwaldon): remove 'self' for now until we have an elegant
@@ -96,22 +100,24 @@ class Controller(object):
             body.set_checksum(checksum)
         return body
 
-    def upload(self, image_id, image_data):
+    def upload(self, image_id, image_data, image_size=None):
         """
         Upload the data for an image.
 
         :param image_id: ID of the image to upload data for.
         :param image_data: File-like object supplying the data to upload.
+        :param image_size: Total size in bytes of image to be uploaded.
         """
         url = '/v2/images/%s/file' % image_id
         hdrs = {'Content-Type': 'application/octet-stream'}
         self.http_client.raw_request('PUT', url,
                                      headers=hdrs,
-                                     body=image_data)
+                                     body=image_data,
+                                     content_length=image_size)
 
     def delete(self, image_id):
         """Delete an image."""
-        self.http_client.json_request('DELETE', 'v2/images/%s' % image_id)
+        self.http_client.json_request('DELETE', '/v2/images/%s' % image_id)
 
     def create(self, **kwargs):
         """Create an image."""
@@ -122,7 +128,7 @@ class Controller(object):
             try:
                 setattr(image, key, value)
             except warlock.InvalidOperation as e:
-                raise TypeError(unicode(e))
+                raise TypeError(utils.exception_to_str(e))
 
         resp, body = self.http_client.json_request('POST', url, body=image)
         #NOTE(esheffield): remove 'self' for now until we have an elegant
@@ -143,7 +149,7 @@ class Controller(object):
             try:
                 setattr(image, key, value)
             except warlock.InvalidOperation as e:
-                raise TypeError(unicode(e))
+                raise TypeError(utils.exception_to_str(e))
 
         if remove_props is not None:
             cur_props = image.keys()
@@ -165,4 +171,95 @@ class Controller(object):
         #NOTE(bcwaldon): calling image.patch doesn't clear the changes, so
         # we need to fetch the image again to get a clean history. This is
         # an obvious optimization for warlock
+        return self.get(image_id)
+
+    def _get_image_with_locations_or_fail(self, image_id):
+        image = self.get(image_id)
+        if getattr(image, 'locations', None) is None:
+            raise exc.HTTPBadRequest('The administrator has disabled '
+                                     'API access to image locations')
+        return image
+
+    def _send_image_update_request(self, image_id, patch_body):
+        url = '/v2/images/%s' % image_id
+        hdrs = {'Content-Type': 'application/openstack-images-v2.1-json-patch'}
+        self.http_client.raw_request('PATCH', url,
+                                     headers=hdrs,
+                                     body=json.dumps(patch_body))
+
+    def add_location(self, image_id, url, metadata):
+        """Add a new location entry to an image's list of locations.
+
+        It is an error to add a URL that is already present in the list of
+        locations.
+
+        :param image_id: ID of image to which the location is to be added.
+        :param url: URL of the location to add.
+        :param metadata: Metadata associated with the location.
+        :returns: The updated image
+        """
+        image = self._get_image_with_locations_or_fail(image_id)
+        url_list = [l['url'] for l in image.locations]
+        if url in url_list:
+            err_str = 'A location entry at %s already exists' % url
+            raise exc.HTTPConflict(err_str)
+
+        add_patch = [{'op': 'add', 'path': '/locations/-',
+                      'value': {'url': url, 'metadata': metadata}}]
+        self._send_image_update_request(image_id, add_patch)
+        return self.get(image_id)
+
+    def delete_locations(self, image_id, url_set):
+        """Remove one or more location entries of an image.
+
+        :param image_id: ID of image from which locations are to be removed.
+        :param url_set: set of URLs of location entries to remove.
+        :returns: None
+        """
+        image = self._get_image_with_locations_or_fail(image_id)
+        current_urls = [l['url'] for l in image.locations]
+
+        missing_locs = url_set.difference(set(current_urls))
+        if missing_locs:
+            raise exc.HTTPNotFound('Unknown URL(s): %s' % list(missing_locs))
+
+        # NOTE: warlock doesn't generate the most efficient patch for remove
+        # operations (it shifts everything up and deletes the tail elements) so
+        # we do it ourselves.
+        url_indices = [current_urls.index(url) for url in url_set]
+        url_indices.sort(reverse=True)
+        patches = [{'op': 'remove', 'path': '/locations/%s' % url_idx}
+                   for url_idx in url_indices]
+        self._send_image_update_request(image_id, patches)
+
+    def update_location(self, image_id, url, metadata):
+        """Update an existing location entry in an image's list of locations.
+
+        The URL specified must be already present in the image's list of
+        locations.
+
+        :param image_id: ID of image whose location is to be updated.
+        :param url: URL of the location to update.
+        :param metadata: Metadata associated with the location.
+        :returns: The updated image
+        """
+        image = self._get_image_with_locations_or_fail(image_id)
+        url_map = dict([(l['url'], l) for l in image.locations])
+        if url not in url_map:
+            raise exc.HTTPNotFound('Unknown URL: %s' % url)
+
+        if url_map[url]['metadata'] == metadata:
+            return image
+
+        # NOTE: The server (as of now) doesn't support modifying individual
+        # location entries. So we must:
+        #   1. Empty existing list of locations.
+        #   2. Send another request to set 'locations' to the new list
+        #      of locations.
+        url_map[url]['metadata'] = metadata
+        patches = [{'op': 'replace',
+                    'path': '/locations',
+                    'value': p} for p in ([], list(url_map.values()))]
+        self._send_image_update_request(image_id, patches)
+
         return self.get(image_id)

@@ -19,11 +19,12 @@ import hashlib
 import logging
 import posixpath
 import socket
-import StringIO
+import ssl
 import struct
-import urlparse
 
+import six
 from six.moves import http_client
+from six.moves.urllib import parse
 
 try:
     import json
@@ -31,14 +32,15 @@ except ImportError:
     import simplejson as json
 
 # Python 2.5 compat fix
-if not hasattr(urlparse, 'parse_qsl'):
+if not hasattr(parse, 'parse_qsl'):
     import cgi
-    urlparse.parse_qsl = cgi.parse_qsl
+    parse.parse_qsl = cgi.parse_qsl
 
 import OpenSSL
 
-from glanceclient import exc
 from glanceclient.common import utils
+from glanceclient import exc
+from glanceclient.openstack.common import network_utils
 from glanceclient.openstack.common import strutils
 
 try:
@@ -60,6 +62,13 @@ except ImportError:
 LOG = logging.getLogger(__name__)
 USER_AGENT = 'python-glanceclient'
 CHUNKSIZE = 1024 * 64  # 64kB
+
+
+def to_bytes(s):
+    if isinstance(s, six.string_types):
+        return six.b(s)
+    else:
+        return s
 
 
 class HTTPClient(object):
@@ -85,7 +94,7 @@ class HTTPClient(object):
 
     @staticmethod
     def parse_endpoint(endpoint):
-        return urlparse.urlparse(endpoint)
+        return network_utils.urlsplit(endpoint)
 
     @staticmethod
     def get_connection_class(scheme):
@@ -119,6 +128,8 @@ class HTTPClient(object):
         curl = ['curl -i -X %s' % method]
 
         for (key, value) in kwargs['headers'].items():
+            if key.lower() == 'x-auth-token':
+                value = '*' * 3
             header = '-H \'%s: %s\'' % (key, value)
             curl.append(header)
 
@@ -139,17 +150,21 @@ class HTTPClient(object):
             curl.append('-d \'%s\'' % kwargs['body'])
 
         curl.append('%s%s' % (self.endpoint, url))
-        LOG.debug(strutils.safe_encode(' '.join(curl)))
+        LOG.debug(strutils.safe_encode(' '.join(curl), errors='ignore'))
 
     @staticmethod
     def log_http_response(resp, body=None):
         status = (resp.version / 10.0, resp.status, resp.reason)
         dump = ['\nHTTP/%.1f %s %s' % status]
-        dump.extend(['%s: %s' % (k, v) for k, v in resp.getheaders()])
+        headers = resp.getheaders()
+        if 'X-Auth-Token' in headers:
+            headers['X-Auth-Token'] = '*' * 3
+        dump.extend(['%s: %s' % (k, v) for k, v in headers])
         dump.append('')
         if body:
+            body = strutils.safe_decode(body)
             dump.extend([body, ''])
-        LOG.debug(strutils.safe_encode('\n'.join(dump)))
+        LOG.debug('\n'.join([strutils.safe_encode(x) for x in dump]))
 
     @staticmethod
     def encode_headers(headers):
@@ -162,8 +177,8 @@ class HTTPClient(object):
         :returns: Dictionary with encoded headers'
                   names and values
         """
-        to_str = strutils.safe_encode
-        return dict([(to_str(h), to_str(v)) for h, v in headers.iteritems()])
+        return dict((strutils.safe_encode(h), strutils.safe_encode(v))
+                    for h, v in six.iteritems(headers))
 
     def _http_request(self, url, method, **kwargs):
         """Send an http request with the specified characteristics.
@@ -178,7 +193,7 @@ class HTTPClient(object):
             kwargs['headers'].setdefault('X-Auth-Token', self.auth_token)
 
         if self.identity_headers:
-            for k, v in self.identity_headers.iteritems():
+            for k, v in six.iteritems(self.identity_headers):
                 kwargs['headers'].setdefault(k, v)
 
         self.log_curl_request(method, url, kwargs)
@@ -199,14 +214,14 @@ class HTTPClient(object):
                 # v1/images/detail'  from recursion.
                 # See bug #1230032 and bug #1208618.
                 if url is not None:
-                    all_parts = urlparse.urlparse(url)
+                    all_parts = parse.urlparse(url)
                     if not (all_parts.scheme and all_parts.netloc):
                         norm_parse = posixpath.normpath
                         url = norm_parse('/'.join([self.endpoint_path, url]))
                 else:
                     url = self.endpoint_path
 
-            conn_url = urlparse.urlsplit(url).geturl()
+            conn_url = parse.urlsplit(url).geturl()
             # Note(flaper87): Ditto, headers / url
             # encoding to make httplib happy.
             conn_url = strutils.safe_encode(conn_url)
@@ -238,14 +253,14 @@ class HTTPClient(object):
 
         # Read body into string if it isn't obviously image data
         if resp.getheader('content-type', None) != 'application/octet-stream':
-            body_str = ''.join([chunk for chunk in body_iter])
+            body_str = b''.join([to_bytes(chunk) for chunk in body_iter])
             self.log_http_response(resp, body_str)
-            body_iter = StringIO.StringIO(body_str)
+            body_iter = six.BytesIO(body_str)
         else:
             self.log_http_response(resp)
 
         if 400 <= resp.status < 600:
-            LOG.error("Request returned failure status.")
+            LOG.debug("Request returned failure status: %d" % resp.status)
             raise exc.from_response(resp, body_str)
         elif resp.status in (301, 302, 305):
             # Redirected. Reissue the request to the new location.
@@ -280,13 +295,67 @@ class HTTPClient(object):
         kwargs.setdefault('headers', {})
         kwargs['headers'].setdefault('Content-Type',
                                      'application/octet-stream')
-        if 'body' in kwargs:
-            if (hasattr(kwargs['body'], 'read')
-                    and method.lower() in ('post', 'put')):
+
+        if 'content_length' in kwargs:
+            content_length = kwargs.pop('content_length')
+        else:
+            content_length = None
+
+        if (('body' in kwargs) and (hasattr(kwargs['body'], 'read') and
+                                    method.lower() in ('post', 'put'))):
+
+            # NOTE(dosaboy): only use chunked transfer if not setting a
+            # content length since setting it will implicitly disable
+            # chunking.
+
+            file_content_length = utils.get_file_size(kwargs['body'])
+            if content_length is None:
+                content_length = file_content_length
+            elif (file_content_length and
+                  (content_length != file_content_length)):
+                errmsg = ("supplied content-length (%s) does not match "
+                          "length of supplied data (%s)" %
+                          (content_length, file_content_length))
+                raise AttributeError(errmsg)
+
+            if content_length is None:
                 # We use 'Transfer-Encoding: chunked' because
                 # body size may not always be known in advance.
                 kwargs['headers']['Transfer-Encoding'] = 'chunked'
+            else:
+                kwargs['headers']['Content-Length'] = str(content_length)
+
         return self._http_request(url, method, **kwargs)
+
+    def client_request(self, method, url, **kwargs):
+        # NOTE(akurilin): this method provides compatibility with methods which
+        # expects requests.Response object(for example - methods of
+        # class Managers from common code).
+        if 'json' in kwargs and 'body' not in kwargs:
+            kwargs['body'] = kwargs.pop('json')
+        resp, body = self.json_request(method, url, **kwargs)
+        resp.json = lambda: body
+        resp.content = bool(body)
+        resp.status_code = resp.status
+        return resp
+
+    def head(self, url, **kwargs):
+        return self.client_request("HEAD", url, **kwargs)
+
+    def get(self, url, **kwargs):
+        return self.client_request("GET", url, **kwargs)
+
+    def post(self, url, **kwargs):
+        return self.client_request("POST", url, **kwargs)
+
+    def put(self, url, **kwargs):
+        return self.client_request("PUT", url, **kwargs)
+
+    def delete(self, url, **kwargs):
+        return self.raw_request("DELETE", url, **kwargs)
+
+    def patch(self, url, **kwargs):
+        return self.client_request("PATCH", url, **kwargs)
 
 
 class OpenSSLConnectionDelegator(object):
@@ -324,45 +393,63 @@ class VerifiedHTTPSConnection(HTTPSConnection):
     def __init__(self, host, port=None, key_file=None, cert_file=None,
                  cacert=None, timeout=None, insecure=False,
                  ssl_compression=True):
-        HTTPSConnection.__init__(self, host, port,
-                                 key_file=key_file,
-                                 cert_file=cert_file)
-        self.key_file = key_file
-        self.cert_file = cert_file
-        self.timeout = timeout
-        self.insecure = insecure
-        self.ssl_compression = ssl_compression
-        self.cacert = cacert
-        self.setcontext()
+        # List of exceptions reported by Python3 instead of
+        # SSLConfigurationError
+        if six.PY3:
+            excp_lst = (TypeError, FileNotFoundError, ssl.SSLError)
+        else:
+            excp_lst = ()
+        try:
+            HTTPSConnection.__init__(self, host, port,
+                                     key_file=key_file,
+                                     cert_file=cert_file)
+            self.key_file = key_file
+            self.cert_file = cert_file
+            self.timeout = timeout
+            self.insecure = insecure
+            self.ssl_compression = ssl_compression
+            self.cacert = None if cacert is None else str(cacert)
+            self.setcontext()
+            # ssl exceptions are reported in various form in Python 3
+            # so to be compatible, we report the same kind as under
+            # Python2
+        except excp_lst as e:
+            raise exc.SSLConfigurationError(str(e))
 
     @staticmethod
     def host_matches_cert(host, x509):
         """
-        Verify that the the x509 certificate we have received
+        Verify that the x509 certificate we have received
         from 'host' correctly identifies the server we are
-        connecting to, ie that the certificate's Common Name
+        connecting to, i.e. that the certificate's Common Name
         or a Subject Alternative Name matches 'host'.
         """
+        def check_match(name):
+            # Directly match the name
+            if name == host:
+                return True
+
+            # Support single wildcard matching
+            if name.startswith('*.') and host.find('.') > 0:
+                if name[2:] == host.split('.', 1)[1]:
+                    return True
+
         common_name = x509.get_subject().commonName
 
         # First see if we can match the CN
-        if common_name == host:
+        if check_match(common_name):
             return True
-
-        # Support single wildcard matching
-        if common_name.startswith('*.') and host.find('.') > 0:
-            if common_name[2:] == host.split('.', 1)[1]:
-                return True
 
         # Also try Subject Alternative Names for a match
         san_list = None
-        for i in xrange(x509.get_extension_count()):
+        for i in range(x509.get_extension_count()):
             ext = x509.get_extension(i)
-            if ext.get_short_name() == 'subjectAltName':
+            if ext.get_short_name() == b'subjectAltName':
                 san_list = str(ext)
                 for san in ''.join(san_list.split()).split(','):
-                    if san == "DNS:%s" % host:
-                        return True
+                    if san.startswith('DNS:'):
+                        if check_match(san.split(':', 1)[1]):
+                            return True
 
         # Server certificate does not match host
         msg = ('Host "%s" does not match x509 certificate contents: '
@@ -427,9 +514,10 @@ class VerifiedHTTPSConnection(HTTPSConnection):
 
         if self.cacert:
             try:
-                self.context.load_verify_locations(self.cacert)
+                self.context.load_verify_locations(to_bytes(self.cacert))
             except Exception as e:
-                msg = 'Unable to load CA from "%s"' % (self.cacert, e)
+                msg = ('Unable to load CA from "%(cacert)s" %(exc)s' %
+                       dict(cacert=self.cacert, exc=e))
                 raise exc.SSLConfigurationError(msg)
         else:
             self.context.set_default_verify_paths()
@@ -505,6 +593,8 @@ class ResponseBodyIterator(object):
                 raise
             else:
                 yield chunk
+                if isinstance(chunk, six.string_types):
+                    chunk = six.b(chunk)
                 md5sum.update(chunk)
 
     def next(self):

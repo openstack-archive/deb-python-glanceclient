@@ -13,11 +13,10 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-import StringIO
-
+import json
 import mock
+import six
 import testtools
 
 from glanceclient.common import http
@@ -55,7 +54,7 @@ class ShellV2Test(testtools.TestCase):
         utils.print_dict = mock.Mock()
         utils.save_image = mock.Mock()
 
-    def _test_with_few_arguments(self, func, func_args, err_msg):
+    def assert_exits_with_msg(self, func, func_args, err_msg):
         with mock.patch.object(utils, 'exit') as mocked_utils_exit:
             mocked_utils_exit.return_value = '%s' % err_msg
 
@@ -90,7 +89,8 @@ class ShellV2Test(testtools.TestCase):
             utils.print_list.assert_called_once_with({}, ['ID', 'Name'])
 
     def test_do_image_show(self):
-        args = self._make_args({'id': 'pass', 'page_size': 18})
+        args = self._make_args({'id': 'pass', 'page_size': 18,
+                                'max_column_width': 120})
         with mock.patch.object(self.gc.images, 'get') as mocked_list:
             ignore_fields = ['self', 'access', 'file', 'schema']
             expect_image = dict([(field, field) for field in ignore_fields])
@@ -100,7 +100,8 @@ class ShellV2Test(testtools.TestCase):
             test_shell.do_image_show(self.gc, args)
 
             mocked_list.assert_called_once_with('pass')
-            utils.print_dict.assert_called_once_with({'id': 'pass'})
+            utils.print_dict.assert_called_once_with({'id': 'pass'},
+                                                     max_column_width=120)
 
     def test_do_image_create_no_user_props(self):
         args = self._make_args({'name': 'IMG-01', 'disk_format': 'vhd',
@@ -207,6 +208,59 @@ class ShellV2Test(testtools.TestCase):
             utils.print_dict.assert_called_once_with({
                 'id': 'pass', 'name': 'IMG-01', 'disk_format': 'vhd'})
 
+    def test_do_location_add_update_with_invalid_json_metadata(self):
+        args = self._make_args({'id': 'pass',
+                                'url': 'http://foo/bar',
+                                'metadata': '{1, 2, 3}'})
+        self.assert_exits_with_msg(test_shell.do_location_add,
+                                   args,
+                                   'Metadata is not a valid JSON object.')
+        self.assert_exits_with_msg(test_shell.do_location_update,
+                                   args,
+                                   'Metadata is not a valid JSON object.')
+
+    def test_do_location_add(self):
+        gc = self.gc
+        loc = {'url': 'http://foo.com/', 'metadata': {'foo': 'bar'}}
+        args = self._make_args({'id': 'pass',
+                                'url': loc['url'],
+                                'metadata': json.dumps(loc['metadata'])})
+        with mock.patch.object(gc.images, 'add_location') as mocked_addloc:
+            expect_image = {'id': 'pass', 'locations': [loc]}
+            mocked_addloc.return_value = expect_image
+
+            test_shell.do_location_add(self.gc, args)
+            mocked_addloc.assert_called_once_with('pass',
+                                                  loc['url'],
+                                                  loc['metadata'])
+            utils.print_dict.assert_called_once_with(expect_image)
+
+    def test_do_location_delete(self):
+        gc = self.gc
+        loc_set = set(['http://foo/bar', 'http://spam/ham'])
+        args = self._make_args({'id': 'pass', 'url': loc_set})
+
+        with mock.patch.object(gc.images, 'delete_locations') as mocked_rmloc:
+            expect_image = {'id': 'pass', 'locations': []}
+            test_shell.do_location_delete(self.gc, args)
+            mocked_rmloc.assert_called_once_with('pass', loc_set)
+
+    def test_do_location_update(self):
+        gc = self.gc
+        loc = {'url': 'http://foo.com/', 'metadata': {'foo': 'bar'}}
+        args = self._make_args({'id': 'pass',
+                                'url': loc['url'],
+                                'metadata': json.dumps(loc['metadata'])})
+        with mock.patch.object(gc.images, 'update_location') as mocked_modloc:
+            expect_image = {'id': 'pass', 'locations': [loc]}
+            mocked_modloc.return_value = expect_image
+
+            test_shell.do_location_update(self.gc, args)
+            mocked_modloc.assert_called_once_with('pass',
+                                                  loc['url'],
+                                                  loc['metadata'])
+            utils.print_dict.assert_called_once_with(expect_image)
+
     def test_do_explain(self):
         input = {
             'page_size': 18,
@@ -221,20 +275,33 @@ class ShellV2Test(testtools.TestCase):
             self.gc.schemas.get.assert_called_once_with('test')
 
     def test_image_upload(self):
-        args = self._make_args({'id': 'IMG-01', 'file': 'test'})
+        args = self._make_args(
+            {'id': 'IMG-01', 'file': 'test', 'size': 1024, 'progress': False})
 
         with mock.patch.object(self.gc.images, 'upload') as mocked_upload:
             utils.get_data_file = mock.Mock(return_value='testfile')
             mocked_upload.return_value = None
             test_shell.do_image_upload(self.gc, args)
-            mocked_upload.assert_called_once_with('IMG-01', 'testfile')
+            mocked_upload.assert_called_once_with('IMG-01', 'testfile', 1024)
+
+    def test_image_upload_with_progressbar(self):
+        args = self._make_args(
+            {'id': 'IMG-01', 'file': 'test', 'size': 1024, 'progress': True})
+
+        with mock.patch.object(self.gc.images, 'upload') as mocked_upload:
+            utils.get_data_file = mock.Mock(return_value='testfile')
+            utils.get_file_size = mock.Mock(return_value=8)
+            mocked_upload.return_value = None
+            test_shell.do_image_upload(self.gc, args)
+            self.assertIsInstance(mocked_upload.call_args[0][1],
+                                  progressbar.VerboseFileWrapper)
 
     def test_image_download(self):
         args = self._make_args(
             {'id': 'pass', 'file': 'test', 'progress': False})
 
         with mock.patch.object(self.gc.images, 'data') as mocked_data:
-            resp = test_utils.FakeResponse({}, StringIO.StringIO('CCC'))
+            resp = test_utils.FakeResponse({}, six.StringIO('CCC'))
             ret = mocked_data.return_value = http.ResponseBodyIterator(resp)
             test_shell.do_image_download(self.gc, args)
 
@@ -246,7 +313,7 @@ class ShellV2Test(testtools.TestCase):
             {'id': 'pass', 'file': 'test', 'progress': True})
 
         with mock.patch.object(self.gc.images, 'data') as mocked_data:
-            resp = test_utils.FakeResponse({}, StringIO.StringIO('CCC'))
+            resp = test_utils.FakeResponse({}, six.StringIO('CCC'))
             mocked_data.return_value = http.ResponseBodyIterator(resp)
             test_shell.do_image_download(self.gc, args)
 
@@ -292,9 +359,9 @@ class ShellV2Test(testtools.TestCase):
         args = self._make_args({'image_id': None, 'member_id': 'MEM-01'})
         msg = 'Unable to create member. Specify image_id and member_id'
 
-        self._test_with_few_arguments(func=test_shell.do_member_create,
-                                      func_args=args,
-                                      err_msg=msg)
+        self.assert_exits_with_msg(func=test_shell.do_member_create,
+                                   func_args=args,
+                                   err_msg=msg)
 
     def test_do_member_update(self):
         input = {
@@ -322,9 +389,9 @@ class ShellV2Test(testtools.TestCase):
         msg = 'Unable to update member. Specify image_id, member_id' \
               ' and member_status'
 
-        self._test_with_few_arguments(func=test_shell.do_member_update,
-                                      func_args=args,
-                                      err_msg=msg)
+        self.assert_exits_with_msg(func=test_shell.do_member_update,
+                                   func_args=args,
+                                   err_msg=msg)
 
     def test_do_member_delete(self):
         args = self._make_args({'image_id': 'IMG-01', 'member_id': 'MEM-01'})
@@ -337,9 +404,9 @@ class ShellV2Test(testtools.TestCase):
         args = self._make_args({'image_id': None, 'member_id': 'MEM-01'})
         msg = 'Unable to delete member. Specify image_id and member_id'
 
-        self._test_with_few_arguments(func=test_shell.do_member_delete,
-                                      func_args=args,
-                                      err_msg=msg)
+        self.assert_exits_with_msg(func=test_shell.do_member_delete,
+                                   func_args=args,
+                                   err_msg=msg)
 
     def test_image_tag_update(self):
         args = self._make_args({'image_id': 'IMG-01', 'tag_value': 'tag01'})
@@ -355,9 +422,9 @@ class ShellV2Test(testtools.TestCase):
         args = self._make_args({'image_id': None, 'tag_value': 'tag01'})
         msg = 'Unable to update tag. Specify image_id and tag_value'
 
-        self._test_with_few_arguments(func=test_shell.do_image_tag_update,
-                                      func_args=args,
-                                      err_msg=msg)
+        self.assert_exits_with_msg(func=test_shell.do_image_tag_update,
+                                   func_args=args,
+                                   err_msg=msg)
 
     def test_image_tag_delete(self):
         args = self._make_args({'image_id': 'IMG-01', 'tag_value': 'tag01'})
@@ -372,6 +439,6 @@ class ShellV2Test(testtools.TestCase):
         args = self._make_args({'image_id': 'IMG-01', 'tag_value': None})
         msg = 'Unable to delete tag. Specify image_id and tag_value'
 
-        self._test_with_few_arguments(func=test_shell.do_image_tag_delete,
-                                      func_args=args,
-                                      err_msg=msg)
+        self.assert_exits_with_msg(func=test_shell.do_image_tag_delete,
+                                   func_args=args,
+                                   err_msg=msg)
