@@ -5,6 +5,7 @@ python-glanceclient (1:0.14.0-1) unstable; urgency=medium
   * Rebased disable-intersphinx.patch.
   * Added a patch to use urllib3 directly, not the vendorized version from
     requests.
+  * Added python-oslosphinx as build-depends-indep.
 
  -- Thomas Goirand <zigo@debian.org>  Wed, 17 Sep 2014 22:55:37 +0800
 
