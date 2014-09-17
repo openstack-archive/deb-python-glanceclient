@@ -1,0 +1,35 @@
+Description: Do not use urllib3 from requests
+ Upstream code is using the embedded version of urllib3 from requests, but the
+ reuqests package in Debian has "unvendorized" it, so the functions aren't
+ present in requests.
+ .
+ This patch restores sanity and uses urllib3 directly.
+Author: Thomas Goirand <zigo@debian.org>
+Forwarded: no
+Last-Update: 2014-09-17
+
+--- python-glanceclient-0.14.0.orig/glanceclient/common/http.py
++++ python-glanceclient-0.14.0/glanceclient/common/http.py
+@@ -19,7 +19,7 @@ import socket
+ 
+ import requests
+ try:
+-    from requests.packages.urllib3.exceptions import ProtocolError
++    from urllib3.exceptions import ProtocolError
+ except ImportError:
+     ProtocolError = requests.exceptions.ConnectionError
+ import six
+--- python-glanceclient-0.14.0.orig/tests/test_ssl.py
++++ python-glanceclient-0.14.0/tests/test_ssl.py
+@@ -16,7 +16,10 @@
+ import os
+ 
+ from OpenSSL import crypto
+-from requests.packages.urllib3 import poolmanager
++try:
++    from requests.packages.urllib3 import poolmanager
++except:
++    from urllib3 import poolmanager
+ import testtools
+ 
+ from glanceclient.common import http

@@ -1,2 +1,3 @@
 install-missing-files.patch
 disable-intersphinx.patch
+do-not-use-embedded-urllib3.patch
