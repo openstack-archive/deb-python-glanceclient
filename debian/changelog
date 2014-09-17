@@ -2,6 +2,7 @@ python-glanceclient (1:0.14.0-1) unstable; urgency=medium
 
   * New upstream release.
   * Uploading to experimental before the freeze of Jessie.
+  * Rebased disable-intersphinx.patch.
 
  -- Thomas Goirand <zigo@debian.org>  Wed, 17 Sep 2014 22:55:37 +0800
 
