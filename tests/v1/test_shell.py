@@ -22,6 +22,8 @@ import subprocess
 import tempfile
 import testtools
 
+import mock
+
 from glanceclient import exc
 from glanceclient import shell
 
@@ -224,120 +226,89 @@ class ShellInvalidEndpointandParameterTest(utils.TestCase):
 
     def test_image_list_invalid_endpoint(self):
         self.assertRaises(
-            exc.InvalidEndpoint, self.run_command, 'image-list')
-
-    def test_image_details_invalid_endpoint_legacy(self):
-        self.assertRaises(
-            exc.InvalidEndpoint, self.run_command, 'details')
-
-    def test_image_update_invalid_endpoint_legacy(self):
-        self.assertRaises(
-            exc.InvalidEndpoint,
-            self.run_command, 'update {"name":""test}')
-
-    def test_image_index_invalid_endpoint_legacy(self):
-        self.assertRaises(
-            exc.InvalidEndpoint,
-            self.run_command, 'index')
+            exc.CommunicationError, self.run_command, 'image-list')
 
     def test_image_create_invalid_endpoint(self):
         self.assertRaises(
-            exc.InvalidEndpoint,
+            exc.CommunicationError,
             self.run_command, 'image-create')
 
     def test_image_delete_invalid_endpoint(self):
         self.assertRaises(
-            exc.InvalidEndpoint,
+            exc.CommunicationError,
             self.run_command, 'image-delete <fake>')
 
     def test_image_download_invalid_endpoint(self):
         self.assertRaises(
-            exc.InvalidEndpoint,
+            exc.CommunicationError,
             self.run_command, 'image-download <fake>')
-
-    def test_image_members_invalid_endpoint(self):
-        self.assertRaises(
-            exc.InvalidEndpoint,
-            self.run_command, 'image-members fake_id')
 
     def test_members_list_invalid_endpoint(self):
         self.assertRaises(
-            exc.InvalidEndpoint,
+            exc.CommunicationError,
             self.run_command, 'member-list --image-id fake')
-
-    def test_member_replace_invalid_endpoint(self):
-        self.assertRaises(
-            exc.InvalidEndpoint,
-            self.run_command, 'members-replace image_id member_id')
-
-    def test_image_show_invalid_endpoint_legacy(self):
-        self.assertRaises(
-            exc.InvalidEndpoint, self.run_command, 'show image')
 
     def test_image_show_invalid_endpoint(self):
         self.assertRaises(
-            exc.InvalidEndpoint,
+            exc.CommunicationError,
             self.run_command, 'image-show --human-readable <IMAGE_ID>')
-
-    def test_member_images_invalid_endpoint_legacy(self):
-        self.assertRaises(
-            exc.InvalidEndpoint,
-            self.run_command, 'member-images member_id')
 
     def test_member_create_invalid_endpoint(self):
         self.assertRaises(
-            exc.InvalidEndpoint,
+            exc.CommunicationError,
             self.run_command,
             'member-create --can-share <IMAGE_ID> <TENANT_ID>')
 
     def test_member_delete_invalid_endpoint(self):
         self.assertRaises(
-            exc.InvalidEndpoint,
+            exc.CommunicationError,
             self.run_command,
             'member-delete  <IMAGE_ID> <TENANT_ID>')
 
-    def test_member_add_invalid_endpoint(self):
-        self.assertRaises(
-            exc.InvalidEndpoint,
-            self.run_command,
-            'member-add  <IMAGE_ID> <TENANT_ID>')
-
-    def test_image_create_invalid_size_parameter(self):
+    @mock.patch('sys.stderr')
+    def test_image_create_invalid_size_parameter(self, __):
         self.assertRaises(
             SystemExit,
             self.run_command, 'image-create --size 10gb')
 
-    def test_image_create_invalid_ram_parameter(self):
+    @mock.patch('sys.stderr')
+    def test_image_create_invalid_ram_parameter(self, __):
         self.assertRaises(
             SystemExit,
             self.run_command, 'image-create --min-ram 10gb')
 
-    def test_image_create_invalid_min_disk_parameter(self):
+    @mock.patch('sys.stderr')
+    def test_image_create_invalid_min_disk_parameter(self, __):
         self.assertRaises(
             SystemExit,
             self.run_command, 'image-create --min-disk 10gb')
 
-    def test_image_update_invalid_size_parameter(self):
+    @mock.patch('sys.stderr')
+    def test_image_update_invalid_size_parameter(self, __):
         self.assertRaises(
             SystemExit,
             self.run_command, 'image-update --size 10gb')
 
-    def test_image_update_invalid_min_disk_parameter(self):
+    @mock.patch('sys.stderr')
+    def test_image_update_invalid_min_disk_parameter(self, __):
         self.assertRaises(
             SystemExit,
             self.run_command, 'image-update --min-disk 10gb')
 
-    def test_image_update_invalid_ram_parameter(self):
+    @mock.patch('sys.stderr')
+    def test_image_update_invalid_ram_parameter(self, __):
         self.assertRaises(
             SystemExit,
             self.run_command, 'image-update --min-ram 10gb')
 
-    def test_image_list_invalid_min_size_parameter(self):
+    @mock.patch('sys.stderr')
+    def test_image_list_invalid_min_size_parameter(self, __):
         self.assertRaises(
             SystemExit,
             self.run_command, 'image-list --size-min 10gb')
 
-    def test_image_list_invalid_max_size_parameter(self):
+    @mock.patch('sys.stderr')
+    def test_image_list_invalid_max_size_parameter(self, __):
         self.assertRaises(
             SystemExit,
             self.run_command, 'image-list --size-max 10gb')

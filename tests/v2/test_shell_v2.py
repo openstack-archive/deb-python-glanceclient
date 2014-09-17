@@ -13,17 +13,12 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-
 import json
 import mock
-import six
 import testtools
 
-from glanceclient.common import http
-from glanceclient.common import progressbar
 from glanceclient.common import utils
 from glanceclient.v2 import shell as test_shell
-from tests import utils as test_utils
 
 
 class ShellV2Test(testtools.TestCase):
@@ -208,16 +203,18 @@ class ShellV2Test(testtools.TestCase):
             utils.print_dict.assert_called_once_with({
                 'id': 'pass', 'name': 'IMG-01', 'disk_format': 'vhd'})
 
-    def test_do_location_add_update_with_invalid_json_metadata(self):
-        args = self._make_args({'id': 'pass',
-                                'url': 'http://foo/bar',
-                                'metadata': '{1, 2, 3}'})
-        self.assert_exits_with_msg(test_shell.do_location_add,
-                                   args,
-                                   'Metadata is not a valid JSON object.')
-        self.assert_exits_with_msg(test_shell.do_location_update,
-                                   args,
-                                   'Metadata is not a valid JSON object.')
+    def test_do_explain(self):
+        input = {
+            'page_size': 18,
+            'id': 'pass',
+            'schemas': 'test',
+            'model': 'test',
+        }
+        args = self._make_args(input)
+        with mock.patch.object(utils, 'print_list'):
+            test_shell.do_explain(self.gc, args)
+
+            self.gc.schemas.get.assert_called_once_with('test')
 
     def test_do_location_add(self):
         gc = self.gc
@@ -241,7 +238,6 @@ class ShellV2Test(testtools.TestCase):
         args = self._make_args({'id': 'pass', 'url': loc_set})
 
         with mock.patch.object(gc.images, 'delete_locations') as mocked_rmloc:
-            expect_image = {'id': 'pass', 'locations': []}
             test_shell.do_location_delete(self.gc, args)
             mocked_rmloc.assert_called_once_with('pass', loc_set)
 
@@ -261,19 +257,6 @@ class ShellV2Test(testtools.TestCase):
                                                   loc['metadata'])
             utils.print_dict.assert_called_once_with(expect_image)
 
-    def test_do_explain(self):
-        input = {
-            'page_size': 18,
-            'id': 'pass',
-            'schemas': 'test',
-            'model': 'test',
-        }
-        args = self._make_args(input)
-        with mock.patch.object(utils, 'print_list'):
-            test_shell.do_explain(self.gc, args)
-
-            self.gc.schemas.get.assert_called_once_with('test')
-
     def test_image_upload(self):
         args = self._make_args(
             {'id': 'IMG-01', 'file': 'test', 'size': 1024, 'progress': False})
@@ -283,46 +266,6 @@ class ShellV2Test(testtools.TestCase):
             mocked_upload.return_value = None
             test_shell.do_image_upload(self.gc, args)
             mocked_upload.assert_called_once_with('IMG-01', 'testfile', 1024)
-
-    def test_image_upload_with_progressbar(self):
-        args = self._make_args(
-            {'id': 'IMG-01', 'file': 'test', 'size': 1024, 'progress': True})
-
-        with mock.patch.object(self.gc.images, 'upload') as mocked_upload:
-            utils.get_data_file = mock.Mock(return_value='testfile')
-            utils.get_file_size = mock.Mock(return_value=8)
-            mocked_upload.return_value = None
-            test_shell.do_image_upload(self.gc, args)
-            self.assertIsInstance(mocked_upload.call_args[0][1],
-                                  progressbar.VerboseFileWrapper)
-
-    def test_image_download(self):
-        args = self._make_args(
-            {'id': 'pass', 'file': 'test', 'progress': False})
-
-        with mock.patch.object(self.gc.images, 'data') as mocked_data:
-            resp = test_utils.FakeResponse({}, six.StringIO('CCC'))
-            ret = mocked_data.return_value = http.ResponseBodyIterator(resp)
-            test_shell.do_image_download(self.gc, args)
-
-            mocked_data.assert_called_once_with('pass')
-            utils.save_image.assert_called_once_with(ret, 'test')
-
-    def test_image_download_with_progressbar(self):
-        args = self._make_args(
-            {'id': 'pass', 'file': 'test', 'progress': True})
-
-        with mock.patch.object(self.gc.images, 'data') as mocked_data:
-            resp = test_utils.FakeResponse({}, six.StringIO('CCC'))
-            mocked_data.return_value = http.ResponseBodyIterator(resp)
-            test_shell.do_image_download(self.gc, args)
-
-            mocked_data.assert_called_once_with('pass')
-            utils.save_image.assert_called_once_with(mock.ANY, 'test')
-            self.assertIsInstance(
-                utils.save_image.call_args[0][0],
-                progressbar.VerboseIteratorWrapper
-            )
 
     def test_do_image_delete(self):
         args = self._make_args({'id': 'pass', 'file': 'test'})
@@ -442,3 +385,502 @@ class ShellV2Test(testtools.TestCase):
         self.assert_exits_with_msg(func=test_shell.do_image_tag_delete,
                                    func_args=args,
                                    err_msg=msg)
+
+    def test_do_md_namespace_create(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'protected': True})
+        with mock.patch.object(self.gc.metadefs_namespace,
+                               'create') as mocked_create:
+            expect_namespace = {}
+            expect_namespace['namespace'] = 'MyNamespace'
+            expect_namespace['protected'] = True
+
+            mocked_create.return_value = expect_namespace
+
+            test_shell.do_md_namespace_create(self.gc, args)
+
+            mocked_create.assert_called_once_with(namespace='MyNamespace',
+                                                  protected=True)
+            utils.print_dict.assert_called_once_with(expect_namespace)
+
+    def test_do_md_namespace_import(self):
+        args = self._make_args({'file': 'test'})
+
+        expect_namespace = {}
+        expect_namespace['namespace'] = 'MyNamespace'
+        expect_namespace['protected'] = True
+
+        with mock.patch.object(self.gc.metadefs_namespace,
+                               'create') as mocked_create:
+            mock_read = mock.Mock(return_value=json.dumps(expect_namespace))
+            mock_file = mock.Mock(read=mock_read)
+            utils.get_data_file = mock.Mock(return_value=mock_file)
+            mocked_create.return_value = expect_namespace
+
+            test_shell.do_md_namespace_import(self.gc, args)
+
+            mocked_create.assert_called_once_with(**expect_namespace)
+            utils.print_dict.assert_called_once_with(expect_namespace)
+
+    def test_do_md_namespace_import_invalid_json(self):
+        args = self._make_args({'file': 'test'})
+        mock_read = mock.Mock(return_value='Invalid')
+        mock_file = mock.Mock(read=mock_read)
+        utils.get_data_file = mock.Mock(return_value=mock_file)
+
+        self.assertRaises(SystemExit, test_shell.do_md_namespace_import,
+                          self.gc, args)
+
+    def test_do_md_namespace_import_no_input(self):
+        args = self._make_args({'file': None})
+        utils.get_data_file = mock.Mock(return_value=None)
+
+        self.assertRaises(SystemExit, test_shell.do_md_namespace_import,
+                          self.gc, args)
+
+    def test_do_md_namespace_update(self):
+        args = self._make_args({'id': 'MyNamespace',
+                                'protected': True})
+        with mock.patch.object(self.gc.metadefs_namespace,
+                               'update') as mocked_update:
+            expect_namespace = {}
+            expect_namespace['namespace'] = 'MyNamespace'
+            expect_namespace['protected'] = True
+
+            mocked_update.return_value = expect_namespace
+
+            test_shell.do_md_namespace_update(self.gc, args)
+
+            mocked_update.assert_called_once_with('MyNamespace',
+                                                  id='MyNamespace',
+                                                  protected=True)
+            utils.print_dict.assert_called_once_with(expect_namespace)
+
+    def test_do_md_namespace_show(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'max_column_width': 80,
+                                'resource_type': None})
+        with mock.patch.object(self.gc.metadefs_namespace,
+                               'get') as mocked_get:
+            expect_namespace = {}
+            expect_namespace['namespace'] = 'MyNamespace'
+
+            mocked_get.return_value = expect_namespace
+
+            test_shell.do_md_namespace_show(self.gc, args)
+
+            mocked_get.assert_called_once_with('MyNamespace')
+            utils.print_dict.assert_called_once_with(expect_namespace, 80)
+
+    def test_do_md_namespace_show_resource_type(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'max_column_width': 80,
+                                'resource_type': 'RESOURCE'})
+        with mock.patch.object(self.gc.metadefs_namespace,
+                               'get') as mocked_get:
+            expect_namespace = {}
+            expect_namespace['namespace'] = 'MyNamespace'
+
+            mocked_get.return_value = expect_namespace
+
+            test_shell.do_md_namespace_show(self.gc, args)
+
+            mocked_get.assert_called_once_with('MyNamespace',
+                                               resource_type='RESOURCE')
+            utils.print_dict.assert_called_once_with(expect_namespace, 80)
+
+    def test_do_md_namespace_list(self):
+        args = self._make_args({'resource_type': None,
+                                'visibility': None,
+                                'page_size': None})
+        with mock.patch.object(self.gc.metadefs_namespace,
+                               'list') as mocked_list:
+            expect_namespaces = [{'namespace': 'MyNamespace'}]
+
+            mocked_list.return_value = expect_namespaces
+
+            test_shell.do_md_namespace_list(self.gc, args)
+
+            mocked_list.assert_called_once_with(filters={})
+            utils.print_list.assert_called_once_with(expect_namespaces,
+                                                     ['namespace'])
+
+    def test_do_md_namespace_list_page_size(self):
+        args = self._make_args({'resource_type': None,
+                                'visibility': None,
+                                'page_size': 2})
+        with mock.patch.object(self.gc.metadefs_namespace,
+                               'list') as mocked_list:
+            expect_namespaces = [{'namespace': 'MyNamespace'}]
+
+            mocked_list.return_value = expect_namespaces
+
+            test_shell.do_md_namespace_list(self.gc, args)
+
+            mocked_list.assert_called_once_with(filters={}, page_size=2)
+            utils.print_list.assert_called_once_with(expect_namespaces,
+                                                     ['namespace'])
+
+    def test_do_md_namespace_list_one_filter(self):
+        args = self._make_args({'resource_types': ['OS::Compute::Aggregate'],
+                                'visibility': None,
+                                'page_size': None})
+        with mock.patch.object(self.gc.metadefs_namespace, 'list') as \
+                mocked_list:
+            expect_namespaces = [{'namespace': 'MyNamespace'}]
+
+            mocked_list.return_value = expect_namespaces
+
+            test_shell.do_md_namespace_list(self.gc, args)
+
+            mocked_list.assert_called_once_with(filters={
+                'resource_types': ['OS::Compute::Aggregate']})
+            utils.print_list.assert_called_once_with(expect_namespaces,
+                                                     ['namespace'])
+
+    def test_do_md_namespace_list_all_filters(self):
+        args = self._make_args({'resource_types': ['OS::Compute::Aggregate'],
+                                'visibility': 'public',
+                                'page_size': None})
+        with mock.patch.object(self.gc.metadefs_namespace,
+                               'list') as mocked_list:
+            expect_namespaces = [{'namespace': 'MyNamespace'}]
+
+            mocked_list.return_value = expect_namespaces
+
+            test_shell.do_md_namespace_list(self.gc, args)
+
+            mocked_list.assert_called_once_with(filters={
+                'resource_types': ['OS::Compute::Aggregate'],
+                'visibility': 'public'})
+            utils.print_list.assert_called_once_with(expect_namespaces,
+                                                     ['namespace'])
+
+    def test_do_md_namespace_list_unknown_filter(self):
+        args = self._make_args({'resource_type': None,
+                                'visibility': None,
+                                'some_arg': 'some_value',
+                                'page_size': None})
+        with mock.patch.object(self.gc.metadefs_namespace,
+                               'list') as mocked_list:
+            expect_namespaces = [{'namespace': 'MyNamespace'}]
+
+            mocked_list.return_value = expect_namespaces
+
+            test_shell.do_md_namespace_list(self.gc, args)
+
+            mocked_list.assert_called_once_with(filters={})
+            utils.print_list.assert_called_once_with(expect_namespaces,
+                                                     ['namespace'])
+
+    def test_do_md_namespace_delete(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'content': False})
+        with mock.patch.object(self.gc.metadefs_namespace, 'delete') as \
+                mocked_delete:
+            test_shell.do_md_namespace_delete(self.gc, args)
+
+            mocked_delete.assert_called_once_with('MyNamespace')
+
+    def test_do_md_resource_type_associate(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'name': 'MyResourceType',
+                                'prefix': 'PREFIX:'})
+        with mock.patch.object(self.gc.metadefs_resource_type,
+                               'associate') as mocked_associate:
+            expect_rt = {}
+            expect_rt['namespace'] = 'MyNamespace'
+            expect_rt['name'] = 'MyResourceType'
+            expect_rt['prefix'] = 'PREFIX:'
+
+            mocked_associate.return_value = expect_rt
+
+            test_shell.do_md_resource_type_associate(self.gc, args)
+
+            mocked_associate.assert_called_once_with('MyNamespace',
+                                                     **expect_rt)
+            utils.print_dict.assert_called_once_with(expect_rt)
+
+    def test_do_md_resource_type_deassociate(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'resource_type': 'MyResourceType'})
+        with mock.patch.object(self.gc.metadefs_resource_type,
+                               'deassociate') as mocked_deassociate:
+            test_shell.do_md_resource_type_deassociate(self.gc, args)
+
+            mocked_deassociate.assert_called_once_with('MyNamespace',
+                                                       'MyResourceType')
+
+    def test_do_md_resource_type_list(self):
+        args = self._make_args({})
+        with mock.patch.object(self.gc.metadefs_resource_type,
+                               'list') as mocked_list:
+            expect_objects = ['MyResourceType1', 'MyResourceType2']
+
+            mocked_list.return_value = expect_objects
+
+            test_shell.do_md_resource_type_list(self.gc, args)
+
+            mocked_list.assert_called_once()
+
+    def test_do_md_namespace_resource_type_list(self):
+        args = self._make_args({'namespace': 'MyNamespace'})
+        with mock.patch.object(self.gc.metadefs_resource_type,
+                               'get') as mocked_get:
+            expect_objects = [{'namespace': 'MyNamespace',
+                               'object': 'MyObject'}]
+
+            mocked_get.return_value = expect_objects
+
+            test_shell.do_md_namespace_resource_type_list(self.gc, args)
+
+            mocked_get.assert_called_once_with('MyNamespace')
+            utils.print_list.assert_called_once_with(expect_objects,
+                                                     ['name', 'prefix',
+                                                      'properties_target'])
+
+    def test_do_md_property_create(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'name': "MyProperty",
+                                'title': "Title",
+                                'schema': '{}'})
+        with mock.patch.object(self.gc.metadefs_property,
+                               'create') as mocked_create:
+            expect_property = {}
+            expect_property['namespace'] = 'MyNamespace'
+            expect_property['name'] = 'MyProperty'
+            expect_property['title'] = 'Title'
+
+            mocked_create.return_value = expect_property
+
+            test_shell.do_md_property_create(self.gc, args)
+
+            mocked_create.assert_called_once_with('MyNamespace',
+                                                  name='MyProperty',
+                                                  title='Title')
+            utils.print_dict.assert_called_once_with(expect_property)
+
+    def test_do_md_property_create_invalid_schema(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'name': "MyProperty",
+                                'title': "Title",
+                                'schema': 'Invalid'})
+        self.assertRaises(SystemExit, test_shell.do_md_property_create,
+                          self.gc, args)
+
+    def test_do_md_property_update(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'property': 'MyProperty',
+                                'name': 'NewName',
+                                'title': "Title",
+                                'schema': '{}'})
+        with mock.patch.object(self.gc.metadefs_property,
+                               'update') as mocked_update:
+            expect_property = {}
+            expect_property['namespace'] = 'MyNamespace'
+            expect_property['name'] = 'MyProperty'
+            expect_property['title'] = 'Title'
+
+            mocked_update.return_value = expect_property
+
+            test_shell.do_md_property_update(self.gc, args)
+
+            mocked_update.assert_called_once_with('MyNamespace', 'MyProperty',
+                                                  name='NewName',
+                                                  title='Title')
+            utils.print_dict.assert_called_once_with(expect_property)
+
+    def test_do_md_property_update_invalid_schema(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'property': 'MyProperty',
+                                'name': "MyObject",
+                                'title': "Title",
+                                'schema': 'Invalid'})
+        self.assertRaises(SystemExit, test_shell.do_md_property_update,
+                          self.gc, args)
+
+    def test_do_md_property_show(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'property': 'MyProperty',
+                                'max_column_width': 80})
+        with mock.patch.object(self.gc.metadefs_property, 'get') as mocked_get:
+            expect_property = {}
+            expect_property['namespace'] = 'MyNamespace'
+            expect_property['property'] = 'MyProperty'
+            expect_property['title'] = 'Title'
+
+            mocked_get.return_value = expect_property
+
+            test_shell.do_md_property_show(self.gc, args)
+
+            mocked_get.assert_called_once_with('MyNamespace', 'MyProperty')
+            utils.print_dict.assert_called_once_with(expect_property, 80)
+
+    def test_do_md_property_delete(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'property': 'MyProperty'})
+        with mock.patch.object(self.gc.metadefs_property,
+                               'delete') as mocked_delete:
+            test_shell.do_md_property_delete(self.gc, args)
+
+            mocked_delete.assert_called_once_with('MyNamespace', 'MyProperty')
+
+    def test_do_md_namespace_property_delete(self):
+        args = self._make_args({'namespace': 'MyNamespace'})
+        with mock.patch.object(self.gc.metadefs_property,
+                               'delete_all') as mocked_delete_all:
+            test_shell.do_md_namespace_properties_delete(self.gc, args)
+
+            mocked_delete_all.assert_called_once_with('MyNamespace')
+
+    def test_do_md_property_list(self):
+        args = self._make_args({'namespace': 'MyNamespace'})
+        with mock.patch.object(self.gc.metadefs_property,
+                               'list') as mocked_list:
+            expect_objects = [{'namespace': 'MyNamespace',
+                               'property': 'MyProperty',
+                               'title': 'MyTitle'}]
+
+            mocked_list.return_value = expect_objects
+
+            test_shell.do_md_property_list(self.gc, args)
+
+            mocked_list.assert_called_once_with('MyNamespace')
+            utils.print_list.assert_called_once_with(expect_objects,
+                                                     ['name', 'title', 'type'])
+
+    def test_do_md_object_create(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'name': "MyObject",
+                                'schema': '{}'})
+        with mock.patch.object(self.gc.metadefs_object,
+                               'create') as mocked_create:
+            expect_object = {}
+            expect_object['namespace'] = 'MyNamespace'
+            expect_object['name'] = 'MyObject'
+
+            mocked_create.return_value = expect_object
+
+            test_shell.do_md_object_create(self.gc, args)
+
+            mocked_create.assert_called_once_with('MyNamespace',
+                                                  name='MyObject')
+            utils.print_dict.assert_called_once_with(expect_object)
+
+    def test_do_md_object_create_invalid_schema(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'name': "MyObject",
+                                'schema': 'Invalid'})
+        self.assertRaises(SystemExit, test_shell.do_md_object_create,
+                          self.gc, args)
+
+    def test_do_md_object_update(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'object': 'MyObject',
+                                'name': 'NewName',
+                                'schema': '{}'})
+        with mock.patch.object(self.gc.metadefs_object,
+                               'update') as mocked_update:
+            expect_object = {}
+            expect_object['namespace'] = 'MyNamespace'
+            expect_object['name'] = 'MyObject'
+
+            mocked_update.return_value = expect_object
+
+            test_shell.do_md_object_update(self.gc, args)
+
+            mocked_update.assert_called_once_with('MyNamespace', 'MyObject',
+                                                  name='NewName')
+            utils.print_dict.assert_called_once_with(expect_object)
+
+    def test_do_md_object_update_invalid_schema(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'object': 'MyObject',
+                                'name': "MyObject",
+                                'schema': 'Invalid'})
+        self.assertRaises(SystemExit, test_shell.do_md_object_update,
+                          self.gc, args)
+
+    def test_do_md_object_show(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'object': 'MyObject',
+                                'max_column_width': 80})
+        with mock.patch.object(self.gc.metadefs_object, 'get') as mocked_get:
+            expect_object = {}
+            expect_object['namespace'] = 'MyNamespace'
+            expect_object['object'] = 'MyObject'
+
+            mocked_get.return_value = expect_object
+
+            test_shell.do_md_object_show(self.gc, args)
+
+            mocked_get.assert_called_once_with('MyNamespace', 'MyObject')
+            utils.print_dict.assert_called_once_with(expect_object, 80)
+
+    def test_do_md_object_property_show(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'object': 'MyObject',
+                                'property': 'MyProperty',
+                                'max_column_width': 80})
+        with mock.patch.object(self.gc.metadefs_object, 'get') as mocked_get:
+            expect_object = {'name': 'MyObject',
+                             'properties': {
+                                 'MyProperty': {'type': 'string'}
+                             }}
+
+            mocked_get.return_value = expect_object
+
+            test_shell.do_md_object_property_show(self.gc, args)
+
+            mocked_get.assert_called_once_with('MyNamespace', 'MyObject')
+            utils.print_dict.assert_called_once_with({'type': 'string',
+                                                      'name': 'MyProperty'},
+                                                     80)
+
+    def test_do_md_object_property_show_non_existing(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'object': 'MyObject',
+                                'property': 'MyProperty',
+                                'max_column_width': 80})
+        with mock.patch.object(self.gc.metadefs_object, 'get') as mocked_get:
+            expect_object = {'name': 'MyObject', 'properties': {}}
+            mocked_get.return_value = expect_object
+
+            self.assertRaises(SystemExit,
+                              test_shell.do_md_object_property_show,
+                              self.gc, args)
+            mocked_get.assert_called_once_with('MyNamespace', 'MyObject')
+
+    def test_do_md_object_delete(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'object': 'MyObject'})
+        with mock.patch.object(self.gc.metadefs_object,
+                               'delete') as mocked_delete:
+            test_shell.do_md_object_delete(self.gc, args)
+
+            mocked_delete.assert_called_once_with('MyNamespace', 'MyObject')
+
+    def test_do_md_namespace_objects_delete(self):
+        args = self._make_args({'namespace': 'MyNamespace'})
+        with mock.patch.object(self.gc.metadefs_object,
+                               'delete_all') as mocked_delete_all:
+            test_shell.do_md_namespace_objects_delete(self.gc, args)
+
+            mocked_delete_all.assert_called_once_with('MyNamespace')
+
+    def test_do_md_object_list(self):
+        args = self._make_args({'namespace': 'MyNamespace'})
+        with mock.patch.object(self.gc.metadefs_object, 'list') as mocked_list:
+            expect_objects = [{'namespace': 'MyNamespace',
+                               'object': 'MyObject'}]
+
+            mocked_list.return_value = expect_objects
+
+            test_shell.do_md_object_list(self.gc, args)
+
+            mocked_list.assert_called_once_with('MyNamespace')
+            utils.print_list.assert_called_once_with(
+                expect_objects,
+                ['name', 'description'],
+                field_settings={
+                    'description': {'align': 'l', 'max_width': 50}})

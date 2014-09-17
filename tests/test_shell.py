@@ -25,31 +25,50 @@ from glanceclient import shell as openstack_shell
 #NOTE (esheffield) Used for the schema caching tests
 from glanceclient.v2 import schemas as schemas
 import json
-
+from tests import keystone_client_fixtures
 from tests import utils
+
+import keystoneclient
+from keystoneclient.openstack.common.apiclient import exceptions as ks_exc
+
 
 DEFAULT_IMAGE_URL = 'http://127.0.0.1:5000/'
 DEFAULT_USERNAME = 'username'
 DEFAULT_PASSWORD = 'password'
 DEFAULT_TENANT_ID = 'tenant_id'
 DEFAULT_TENANT_NAME = 'tenant_name'
-DEFAULT_AUTH_URL = 'http://127.0.0.1:5000/v2.0/'
+DEFAULT_PROJECT_ID = '0123456789'
+DEFAULT_USER_DOMAIN_NAME = 'user_domain_name'
+DEFAULT_UNVERSIONED_AUTH_URL = 'http://127.0.0.1:5000/'
+DEFAULT_V2_AUTH_URL = 'http://127.0.0.1:5000/v2.0/'
+DEFAULT_V3_AUTH_URL = 'http://127.0.0.1:5000/v3/'
 DEFAULT_AUTH_TOKEN = ' 3bcc3d3a03f44e3d8377f9247b0ad155'
 TEST_SERVICE_URL = 'http://127.0.0.1:5000/'
 
+FAKE_V2_ENV = {'OS_USERNAME': DEFAULT_USERNAME,
+               'OS_PASSWORD': DEFAULT_PASSWORD,
+               'OS_TENANT_NAME': DEFAULT_TENANT_NAME,
+               'OS_AUTH_URL': DEFAULT_V2_AUTH_URL,
+               'OS_IMAGE_URL': DEFAULT_IMAGE_URL}
+
+FAKE_V3_ENV = {'OS_USERNAME': DEFAULT_USERNAME,
+               'OS_PASSWORD': DEFAULT_PASSWORD,
+               'OS_PROJECT_ID': DEFAULT_PROJECT_ID,
+               'OS_USER_DOMAIN_NAME': DEFAULT_USER_DOMAIN_NAME,
+               'OS_AUTH_URL': DEFAULT_V3_AUTH_URL,
+               'OS_IMAGE_URL': DEFAULT_IMAGE_URL}
+
 
 class ShellTest(utils.TestCase):
+    # auth environment to use
+    auth_env = FAKE_V2_ENV.copy()
+    # expected auth plugin to invoke
+    auth_plugin = 'keystoneclient.auth.identity.v2.Password'
+
     def setUp(self):
         super(ShellTest, self).setUp()
         global _old_env
-        fake_env = {
-            'OS_USERNAME': DEFAULT_USERNAME,
-            'OS_PASSWORD': DEFAULT_PASSWORD,
-            'OS_TENANT_NAME': DEFAULT_TENANT_NAME,
-            'OS_AUTH_URL': DEFAULT_AUTH_URL,
-            'OS_IMAGE_URL': DEFAULT_IMAGE_URL,
-            'OS_AUTH_TOKEN': DEFAULT_AUTH_TOKEN}
-        _old_env, os.environ = os.environ, fake_env.copy()
+        _old_env, os.environ = os.environ, self.auth_env
 
         global shell, _shell, assert_called, assert_called_anytime
         _shell = openstack_shell.OpenStackImagesShell()
@@ -88,16 +107,183 @@ class ShellTest(utils.TestCase):
         # Convert ArgumentPaser to string first.
         self.assertEqual(str(expected), str(actual_parser))
 
-    def test_get_image_url_by_ipv6Addr_host(self):
-        fake_args = lambda: None
-        setattr(fake_args, 'os_image_url', None)
-        setattr(fake_args, 'host', '2011:2013:1:f101::1')
-        setattr(fake_args, 'use_ssl', True)
-        setattr(fake_args, 'port', '9292')
-        expected_image_url = 'https://[2011:2013:1:f101::1]:9292/'
-        test_shell = openstack_shell.OpenStackImagesShell()
-        targeted_image_url = test_shell._get_image_url(fake_args)
-        self.assertEqual(expected_image_url, targeted_image_url)
+    @mock.patch.object(openstack_shell.OpenStackImagesShell,
+                       '_get_versioned_client')
+    def test_cert_and_key_args_interchangeable(self,
+                                               mock_versioned_client):
+        # make sure --os-cert and --os-key are passed correctly
+        args = '--os-cert mycert --os-key mykey image-list'
+        shell(args)
+        assert mock_versioned_client.called
+        ((api_version, args), kwargs) = mock_versioned_client.call_args
+        self.assertEqual(args.os_cert, 'mycert')
+        self.assertEqual(args.os_key, 'mykey')
+
+        # make sure we get the same thing with --cert-file and --key-file
+        args = '--cert-file mycertfile --key-file mykeyfile image-list'
+        glance_shell = openstack_shell.OpenStackImagesShell()
+        glance_shell.main(args.split())
+        assert mock_versioned_client.called
+        ((api_version, args), kwargs) = mock_versioned_client.call_args
+        self.assertEqual(args.os_cert, 'mycertfile')
+        self.assertEqual(args.os_key, 'mykeyfile')
+
+    @mock.patch('glanceclient.v1.client.Client')
+    def test_no_auth_with_token_and_image_url_with_v1(self, v1_client):
+        # test no authentication is required if both token and endpoint url
+        # are specified
+        args = ('--os-auth-token mytoken --os-image-url https://image:1234/v1 '
+                'image-list')
+        glance_shell = openstack_shell.OpenStackImagesShell()
+        glance_shell.main(args.split())
+        assert v1_client.called
+        (args, kwargs) = v1_client.call_args
+        self.assertEqual(kwargs['token'], 'mytoken')
+        self.assertEqual(args[0], 'https://image:1234/v1')
+
+    @mock.patch.object(openstack_shell.OpenStackImagesShell, '_cache_schemas')
+    def test_no_auth_with_token_and_image_url_with_v2(self,
+                                                      cache_schemas):
+        with mock.patch('glanceclient.v2.client.Client') as v2_client:
+            # test no authentication is required if both token and endpoint url
+            # are specified
+            args = ('--os-auth-token mytoken '
+                    '--os-image-url https://image:1234/v2 '
+                    '--os-image-api-version 2 image-list')
+            glance_shell = openstack_shell.OpenStackImagesShell()
+            glance_shell.main(args.split())
+            ((args), kwargs) = v2_client.call_args
+            self.assertEqual(args[0], 'https://image:1234/v2')
+            self.assertEqual(kwargs['token'], 'mytoken')
+
+    def _assert_auth_plugin_args(self, mock_auth_plugin):
+        # make sure our auth plugin is invoked with the correct args
+        mock_auth_plugin.assert_called_once_with(
+            keystone_client_fixtures.V2_URL,
+            self.auth_env['OS_USERNAME'],
+            self.auth_env['OS_PASSWORD'],
+            tenant_name=self.auth_env['OS_TENANT_NAME'],
+            tenant_id='')
+
+    @mock.patch('glanceclient.v1.client.Client')
+    @mock.patch('keystoneclient.session.Session')
+    @mock.patch.object(keystoneclient.discover.Discover, 'url_for',
+                       side_effect=[keystone_client_fixtures.V2_URL, None])
+    def test_auth_plugin_invocation_with_v1(self,
+                                            v1_client,
+                                            ks_session,
+                                            url_for):
+        with mock.patch(self.auth_plugin) as mock_auth_plugin:
+            args = 'image-list'
+            glance_shell = openstack_shell.OpenStackImagesShell()
+            glance_shell.main(args.split())
+            self._assert_auth_plugin_args(mock_auth_plugin)
+
+    @mock.patch('glanceclient.v2.client.Client')
+    @mock.patch('keystoneclient.session.Session')
+    @mock.patch.object(openstack_shell.OpenStackImagesShell, '_cache_schemas')
+    @mock.patch.object(keystoneclient.discover.Discover, 'url_for',
+                       side_effect=[keystone_client_fixtures.V2_URL, None])
+    def test_auth_plugin_invocation_with_v2(self,
+                                            v2_client,
+                                            ks_session,
+                                            url_for,
+                                            cache_schemas):
+        with mock.patch(self.auth_plugin) as mock_auth_plugin:
+            args = '--os-image-api-version 2 image-list'
+            glance_shell = openstack_shell.OpenStackImagesShell()
+            glance_shell.main(args.split())
+            self._assert_auth_plugin_args(mock_auth_plugin)
+
+    @mock.patch('glanceclient.v1.client.Client')
+    @mock.patch('keystoneclient.session.Session')
+    @mock.patch.object(keystoneclient.discover.Discover, 'url_for',
+                       side_effect=[keystone_client_fixtures.V2_URL,
+                                    keystone_client_fixtures.V3_URL])
+    def test_auth_plugin_invocation_with_unversioned_auth_url_with_v1(
+            self, v1_client, ks_session, url_for):
+        with mock.patch(self.auth_plugin) as mock_auth_plugin:
+            args = '--os-auth-url %s image-list' % (
+                keystone_client_fixtures.BASE_URL)
+            glance_shell = openstack_shell.OpenStackImagesShell()
+            glance_shell.main(args.split())
+            self._assert_auth_plugin_args(mock_auth_plugin)
+
+    @mock.patch('glanceclient.v2.client.Client')
+    @mock.patch('keystoneclient.session.Session')
+    @mock.patch.object(openstack_shell.OpenStackImagesShell, '_cache_schemas')
+    @mock.patch.object(keystoneclient.discover.Discover, 'url_for',
+                       side_effect=[keystone_client_fixtures.V2_URL,
+                                    keystone_client_fixtures.V3_URL])
+    def test_auth_plugin_invocation_with_unversioned_auth_url_with_v2(
+            self, v2_client, ks_session, cache_schemas, url_for):
+        with mock.patch(self.auth_plugin) as mock_auth_plugin:
+            args = ('--os-auth-url %s --os-image-api-version 2 '
+                    'image-list') % (keystone_client_fixtures.BASE_URL)
+            glance_shell = openstack_shell.OpenStackImagesShell()
+            glance_shell.main(args.split())
+            self._assert_auth_plugin_args(mock_auth_plugin)
+
+
+class ShellTestWithKeystoneV3Auth(ShellTest):
+    # auth environment to use
+    auth_env = FAKE_V3_ENV.copy()
+    # expected auth plugin to invoke
+    auth_plugin = 'keystoneclient.auth.identity.v3.Password'
+
+    def _assert_auth_plugin_args(self, mock_auth_plugin):
+        mock_auth_plugin.assert_called_once_with(
+            keystone_client_fixtures.V3_URL,
+            user_id='',
+            username=self.auth_env['OS_USERNAME'],
+            password=self.auth_env['OS_PASSWORD'],
+            user_domain_id='',
+            user_domain_name=self.auth_env['OS_USER_DOMAIN_NAME'],
+            project_id=self.auth_env['OS_PROJECT_ID'],
+            project_name='',
+            project_domain_id='',
+            project_domain_name='')
+
+    @mock.patch('glanceclient.v1.client.Client')
+    @mock.patch('keystoneclient.session.Session')
+    @mock.patch.object(keystoneclient.discover.Discover, 'url_for',
+                       side_effect=[None, keystone_client_fixtures.V3_URL])
+    def test_auth_plugin_invocation_with_v1(self,
+                                            v1_client,
+                                            ks_session,
+                                            url_for):
+        with mock.patch(self.auth_plugin) as mock_auth_plugin:
+            args = 'image-list'
+            glance_shell = openstack_shell.OpenStackImagesShell()
+            glance_shell.main(args.split())
+            self._assert_auth_plugin_args(mock_auth_plugin)
+
+    @mock.patch('glanceclient.v2.client.Client')
+    @mock.patch('keystoneclient.session.Session')
+    @mock.patch.object(openstack_shell.OpenStackImagesShell, '_cache_schemas')
+    @mock.patch.object(keystoneclient.discover.Discover, 'url_for',
+                       side_effect=[None, keystone_client_fixtures.V3_URL])
+    def test_auth_plugin_invocation_with_v2(self,
+                                            v2_client,
+                                            ks_session,
+                                            url_for,
+                                            cache_schemas):
+        with mock.patch(self.auth_plugin) as mock_auth_plugin:
+            args = '--os-image-api-version 2 image-list'
+            glance_shell = openstack_shell.OpenStackImagesShell()
+            glance_shell.main(args.split())
+            self._assert_auth_plugin_args(mock_auth_plugin)
+
+    @mock.patch('keystoneclient.session.Session')
+    @mock.patch('keystoneclient.discover.Discover',
+                side_effect=ks_exc.ClientException())
+    def test_api_discovery_failed_with_unversioned_auth_url(self,
+                                                            ks_session,
+                                                            discover):
+        args = '--os-auth-url %s image-list' % (
+            keystone_client_fixtures.BASE_URL)
+        glance_shell = openstack_shell.OpenStackImagesShell()
+        self.assertRaises(exc.CommandError, glance_shell.main, args.split())
 
 
 class ShellCacheSchemaTest(utils.TestCase):
@@ -105,13 +291,13 @@ class ShellCacheSchemaTest(utils.TestCase):
         super(ShellCacheSchemaTest, self).setUp()
         self._mock_client_setup()
         self._mock_shell_setup()
-        os.path.exists = mock.MagicMock()
         self.cache_dir = '/dir_for_cached_schema'
-        self.cache_file = self.cache_dir + '/image_schema.json'
+        self.cache_files = [self.cache_dir + '/image_schema.json',
+                            self.cache_dir + '/namespace_schema.json',
+                            self.cache_dir + '/resource_type_schema.json']
 
     def tearDown(self):
         super(ShellCacheSchemaTest, self).tearDown()
-        os.path.exists.reset_mock()
 
     def _mock_client_setup(self):
         self.schema_dict = {
@@ -137,51 +323,57 @@ class ShellCacheSchemaTest(utils.TestCase):
         return Args(args)
 
     @mock.patch('six.moves.builtins.open', new=mock.mock_open(), create=True)
-    def test_cache_schema_gets_when_not_exists(self):
-        mocked_path_exists_result_lst = [True, False]
-        os.path.exists.side_effect = \
-            lambda *args: mocked_path_exists_result_lst.pop(0)
-
-        options = {
-            'get_schema': False
-        }
-
-        self.shell._cache_schema(self._make_args(options),
-                                 home_dir=self.cache_dir)
-
-        self.assertEqual(4, open.mock_calls.__len__())
-        self.assertEqual(mock.call(self.cache_file, 'w'), open.mock_calls[0])
-        self.assertEqual(mock.call().write(json.dumps(self.schema_dict)),
-                         open.mock_calls[2])
-
-    @mock.patch('six.moves.builtins.open', new=mock.mock_open(), create=True)
-    def test_cache_schema_gets_when_forced(self):
-        os.path.exists.return_value = True
-
+    @mock.patch('os.path.exists', return_value=True)
+    def test_cache_schemas_gets_when_forced(self, exists_mock):
         options = {
             'get_schema': True
         }
 
-        self.shell._cache_schema(self._make_args(options),
-                                 home_dir=self.cache_dir)
+        self.shell._cache_schemas(self._make_args(options),
+                                  home_dir=self.cache_dir)
 
-        self.assertEqual(4, open.mock_calls.__len__())
-        self.assertEqual(mock.call(self.cache_file, 'w'), open.mock_calls[0])
+        self.assertEqual(12, open.mock_calls.__len__())
+        self.assertEqual(mock.call(self.cache_files[0], 'w'),
+                         open.mock_calls[0])
+        self.assertEqual(mock.call(self.cache_files[1], 'w'),
+                         open.mock_calls[4])
         self.assertEqual(mock.call().write(json.dumps(self.schema_dict)),
                          open.mock_calls[2])
+        self.assertEqual(mock.call().write(json.dumps(self.schema_dict)),
+                         open.mock_calls[6])
 
     @mock.patch('six.moves.builtins.open', new=mock.mock_open(), create=True)
-    def test_cache_schema_leaves_when_present_not_forced(self):
-        os.path.exists.return_value = True
-
+    @mock.patch('os.path.exists', side_effect=[True, False, False, False])
+    def test_cache_schemas_gets_when_not_exists(self, exists_mock):
         options = {
             'get_schema': False
         }
 
-        self.shell._cache_schema(self._make_args(options),
-                                 home_dir=self.cache_dir)
+        self.shell._cache_schemas(self._make_args(options),
+                                  home_dir=self.cache_dir)
+
+        self.assertEqual(12, open.mock_calls.__len__())
+        self.assertEqual(mock.call(self.cache_files[0], 'w'),
+                         open.mock_calls[0])
+        self.assertEqual(mock.call(self.cache_files[1], 'w'),
+                         open.mock_calls[4])
+        self.assertEqual(mock.call().write(json.dumps(self.schema_dict)),
+                         open.mock_calls[2])
+        self.assertEqual(mock.call().write(json.dumps(self.schema_dict)),
+                         open.mock_calls[6])
+
+    @mock.patch('six.moves.builtins.open', new=mock.mock_open(), create=True)
+    @mock.patch('os.path.exists', return_value=True)
+    def test_cache_schemas_leaves_when_present_not_forced(self, exists_mock):
+        options = {
+            'get_schema': False
+        }
+
+        self.shell._cache_schemas(self._make_args(options),
+                                  home_dir=self.cache_dir)
 
         os.path.exists.assert_any_call(self.cache_dir)
-        os.path.exists.assert_any_call(self.cache_file)
-        self.assertEqual(2, os.path.exists.call_count)
+        os.path.exists.assert_any_call(self.cache_files[0])
+        os.path.exists.assert_any_call(self.cache_files[1])
+        self.assertEqual(4, exists_mock.call_count)
         self.assertEqual(0, open.mock_calls.__len__())

@@ -15,7 +15,6 @@
 
 import errno
 import json
-import sys
 import testtools
 
 import six
@@ -23,7 +22,6 @@ from six.moves.urllib import parse
 
 from glanceclient.v1 import client
 from glanceclient.v1 import images
-from glanceclient.v1 import legacy_shell
 from glanceclient.v1 import shell
 from tests import utils
 
@@ -522,12 +520,11 @@ class ImageManagerTest(testtools.TestCase):
 
     def test_get_encoding(self):
         image = self.mgr.get('3')
-        expect = [('HEAD', '/v1/images/3', {}, None)]
         self.assertEqual(u"ni\xf1o", image.name)
 
     def test_get_req_id(self):
         params = {'return_req_id': []}
-        image = self.mgr.get('4', **params)
+        self.mgr.get('4', **params)
         expect_req_id = ['req-1234']
         self.assertEqual(expect_req_id, params['return_req_id'])
 
@@ -564,7 +561,7 @@ class ImageManagerTest(testtools.TestCase):
             'do_checksum': False,
             'return_req_id': [],
         }
-        data = ''.join([b for b in self.mgr.data('4', **params)])
+        ''.join([b for b in self.mgr.data('4', **params)])
         expect_req_id = ['req-1234']
         self.assertEqual(expect_req_id, params['return_req_id'])
 
@@ -933,7 +930,7 @@ class ParameterFakeAPI(utils.FakeAPI):
         },
     ]}
 
-    def json_request(self, method, url, **kwargs):
+    def get(self, url, **kwargs):
         self.url = url
         return utils.FakeResponse({}), ParameterFakeAPI.image_list
 
@@ -964,20 +961,3 @@ class UrlParameterTest(testtools.TestCase):
         qs_dict = parse.parse_qs(parts.query)
         self.assertTrue('is_public' in qs_dict)
         self.assertTrue(qs_dict['is_public'][0].lower() == "true")
-
-    def test_copy_from_used(self):
-        class LegacyFakeArg(object):
-            def __init__(self, fields):
-                self.fields = fields
-                self.dry_run = False
-                self.verbose = False
-
-        def images_create(**kwargs):
-            class FakeImage():
-                id = "ThisiSanID"
-            self.assertNotEqual(kwargs['data'], sys.stdin)
-            return FakeImage()
-
-        self.gc.images.create = images_create
-        args = LegacyFakeArg(["copy_from=http://somehost.com/notreal.qcow"])
-        legacy_shell.do_add(self.gc, args)

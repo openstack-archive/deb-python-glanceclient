@@ -26,9 +26,6 @@ from glanceclient import exc
 from glanceclient.openstack.common import strutils
 import glanceclient.v1.images
 
-#NOTE(bcwaldon): import deprecated cli functions
-from glanceclient.v1.legacy_shell import *
-
 CONTAINER_FORMATS = 'Acceptable formats: ami, ari, aki, bare, and ovf.'
 DISK_FORMATS = ('Acceptable formats: ami, ari, aki, vhd, vmdk, raw, '
                 'qcow2, vdi, and iso.')
@@ -177,7 +174,9 @@ def do_image_download(gc, args):
 @utils.arg('--location', metavar='<IMAGE_URL>',
            help=('URL where the data for this image already resides. For '
                  'example, if the image data is stored in swift, you could '
-                 'specify \'swift://account:key@example.com/container/obj\'.'))
+                 'specify \'swift+http://tenant%%3Aaccount:key@auth_url/'
+                 'v2.0/container/obj\'. '
+                 '(Note: \'%%3A\' is \':\' URL encoded.)'))
 @utils.arg('--file', metavar='<FILE>',
            help=('Local file that contains disk image to be uploaded during'
                  ' creation. Alternatively, images can be passed to the client'
@@ -211,7 +210,7 @@ def do_image_create(gc, args):
     # Filter out None values
     fields = dict(filter(lambda x: x[1] is not None, vars(args).items()))
 
-    fields['is_public'] = fields.get('is_public') or fields.pop('public')
+    fields['is_public'] = fields.get('is_public')
 
     if 'is_protected' in fields:
         fields['protected'] = fields.pop('is_protected')
@@ -257,7 +256,9 @@ def do_image_create(gc, args):
 @utils.arg('--location', metavar='<IMAGE_URL>',
            help=('URL where the data for this image already resides. For '
                  'example, if the image data is stored in swift, you could '
-                 'specify \'swift://account:key@example.com/container/obj\'.'))
+                 'specify \'swift+http://tenant%%3Aaccount:key@auth_url/'
+                 'v2.0/container/obj\'. '
+                 '(Note: \'%%3A\' is \':\' URL encoded.)'))
 @utils.arg('--file', metavar='<FILE>',
            help=('Local file that contains disk image to be uploaded during'
                  ' update. Alternatively, images can be passed to the client'
@@ -382,9 +383,4 @@ def do_member_create(gc, args):
 def do_member_delete(gc, args):
     """Remove a shared image from a tenant."""
     image_id = utils.find_resource(gc.images, args.image).id
-    if not args.dry_run:
-        gc.image_members.delete(image_id, args.tenant_id)
-    else:
-        print("Dry run. We would have done the following:")
-        print('Remove "%s" from the member list of image '
-              '"%s"' % (args.tenant_id, args.image))
+    gc.image_members.delete(image_id, args.tenant_id)

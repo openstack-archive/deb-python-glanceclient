@@ -16,14 +16,36 @@
 import os
 
 from OpenSSL import crypto
+from requests.packages.urllib3 import poolmanager
 import testtools
 
 from glanceclient.common import http
+from glanceclient.common import https
 from glanceclient import exc
 
 
 TEST_VAR_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                             'var'))
+
+
+class TestRequestsIntegration(testtools.TestCase):
+
+    def test_pool_patch(self):
+        client = http.HTTPClient("https://localhost",
+                                 ssl_compression=True)
+        self.assertNotEqual(https.HTTPSConnectionPool,
+                            poolmanager.pool_classes_by_scheme["https"])
+
+        adapter = client.session.adapters.get("https://")
+        self.assertFalse(isinstance(adapter, https.HTTPSAdapter))
+
+        client = http.HTTPClient("https://localhost",
+                                 ssl_compression=False)
+        self.assertEqual(https.HTTPSConnectionPool,
+                         poolmanager.pool_classes_by_scheme["https"])
+
+        adapter = client.session.adapters.get("https://")
+        self.assertTrue(isinstance(adapter, https.HTTPSAdapter))
 
 
 class TestVerifiedHTTPSConnection(testtools.TestCase):
@@ -35,10 +57,10 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         cert_file = os.path.join(TEST_VAR_DIR, 'certificate.crt')
         cacert = os.path.join(TEST_VAR_DIR, 'ca.crt')
         try:
-            conn = http.VerifiedHTTPSConnection('127.0.0.1', 0,
-                                                key_file=key_file,
-                                                cert_file=cert_file,
-                                                cacert=cacert)
+            https.VerifiedHTTPSConnection('127.0.0.1', 0,
+                                          key_file=key_file,
+                                          cert_file=cert_file,
+                                          cacert=cacert)
         except exc.SSLConfigurationError:
             self.fail('Failed to init VerifiedHTTPSConnection.')
 
@@ -49,9 +71,9 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         cert_file = os.path.join(TEST_VAR_DIR, 'certificate.crt')
         cacert = os.path.join(TEST_VAR_DIR, 'ca.crt')
         try:
-            conn = http.VerifiedHTTPSConnection('127.0.0.1', 0,
-                                                cert_file=cert_file,
-                                                cacert=cacert)
+            https.VerifiedHTTPSConnection('127.0.0.1', 0,
+                                          cert_file=cert_file,
+                                          cacert=cacert)
             self.fail('Failed to raise assertion.')
         except exc.SSLConfigurationError:
             pass
@@ -63,9 +85,9 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         key_file = os.path.join(TEST_VAR_DIR, 'privatekey.key')
         cacert = os.path.join(TEST_VAR_DIR, 'ca.crt')
         try:
-            conn = http.VerifiedHTTPSConnection('127.0.0.1', 0,
-                                                key_file=key_file,
-                                                cacert=cacert)
+            https.VerifiedHTTPSConnection('127.0.0.1', 0,
+                                          key_file=key_file,
+                                          cacert=cacert)
         except exc.SSLConfigurationError:
             pass
         except Exception:
@@ -75,13 +97,12 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         """
         Test VerifiedHTTPSConnection: bad key.
         """
-        key_file = os.path.join(TEST_VAR_DIR, 'badkey.key')
         cert_file = os.path.join(TEST_VAR_DIR, 'certificate.crt')
         cacert = os.path.join(TEST_VAR_DIR, 'ca.crt')
         try:
-            conn = http.VerifiedHTTPSConnection('127.0.0.1', 0,
-                                                cert_file=cert_file,
-                                                cacert=cacert)
+            https.VerifiedHTTPSConnection('127.0.0.1', 0,
+                                          cert_file=cert_file,
+                                          cacert=cacert)
             self.fail('Failed to raise assertion.')
         except exc.SSLConfigurationError:
             pass
@@ -90,13 +111,12 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         """
         Test VerifiedHTTPSConnection: bad cert.
         """
-        key_file = os.path.join(TEST_VAR_DIR, 'privatekey.key')
         cert_file = os.path.join(TEST_VAR_DIR, 'badcert.crt')
         cacert = os.path.join(TEST_VAR_DIR, 'ca.crt')
         try:
-            conn = http.VerifiedHTTPSConnection('127.0.0.1', 0,
-                                                cert_file=cert_file,
-                                                cacert=cacert)
+            https.VerifiedHTTPSConnection('127.0.0.1', 0,
+                                          cert_file=cert_file,
+                                          cacert=cacert)
             self.fail('Failed to raise assertion.')
         except exc.SSLConfigurationError:
             pass
@@ -105,13 +125,12 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         """
         Test VerifiedHTTPSConnection: bad CA.
         """
-        key_file = os.path.join(TEST_VAR_DIR, 'privatekey.key')
         cert_file = os.path.join(TEST_VAR_DIR, 'certificate.crt')
         cacert = os.path.join(TEST_VAR_DIR, 'badca.crt')
         try:
-            conn = http.VerifiedHTTPSConnection('127.0.0.1', 0,
-                                                cert_file=cert_file,
-                                                cacert=cacert)
+            https.VerifiedHTTPSConnection('127.0.0.1', 0,
+                                          cert_file=cert_file,
+                                          cacert=cacert)
             self.fail('Failed to raise assertion.')
         except exc.SSLConfigurationError:
             pass
@@ -126,7 +145,7 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         # The expected cert should have CN=0.0.0.0
         self.assertEqual('0.0.0.0', cert.get_subject().commonName)
         try:
-            conn = http.VerifiedHTTPSConnection('0.0.0.0', 0)
+            conn = https.VerifiedHTTPSConnection('0.0.0.0', 0)
             conn.verify_callback(None, cert, 0, 0, 1)
         except Exception:
             self.fail('Unexpected exception.')
@@ -141,7 +160,7 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         # The expected cert should have CN=*.pong.example.com
         self.assertEqual('*.pong.example.com', cert.get_subject().commonName)
         try:
-            conn = http.VerifiedHTTPSConnection('ping.pong.example.com', 0)
+            conn = https.VerifiedHTTPSConnection('ping.pong.example.com', 0)
             conn.verify_callback(None, cert, 0, 0, 1)
         except Exception:
             self.fail('Unexpected exception.')
@@ -156,13 +175,13 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         # The expected cert should have CN=0.0.0.0
         self.assertEqual('0.0.0.0', cert.get_subject().commonName)
         try:
-            conn = http.VerifiedHTTPSConnection('alt1.example.com', 0)
+            conn = https.VerifiedHTTPSConnection('alt1.example.com', 0)
             conn.verify_callback(None, cert, 0, 0, 1)
         except Exception:
             self.fail('Unexpected exception.')
 
         try:
-            conn = http.VerifiedHTTPSConnection('alt2.example.com', 0)
+            conn = https.VerifiedHTTPSConnection('alt2.example.com', 0)
             conn.verify_callback(None, cert, 0, 0, 1)
         except Exception:
             self.fail('Unexpected exception.')
@@ -177,19 +196,19 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         # The expected cert should have CN=0.0.0.0
         self.assertEqual('0.0.0.0', cert.get_subject().commonName)
         try:
-            conn = http.VerifiedHTTPSConnection('alt1.example.com', 0)
+            conn = https.VerifiedHTTPSConnection('alt1.example.com', 0)
             conn.verify_callback(None, cert, 0, 0, 1)
         except Exception:
             self.fail('Unexpected exception.')
 
         try:
-            conn = http.VerifiedHTTPSConnection('alt2.example.com', 0)
+            conn = https.VerifiedHTTPSConnection('alt2.example.com', 0)
             conn.verify_callback(None, cert, 0, 0, 1)
         except Exception:
             self.fail('Unexpected exception.')
 
         try:
-            conn = http.VerifiedHTTPSConnection('alt3.example.net', 0)
+            conn = https.VerifiedHTTPSConnection('alt3.example.net', 0)
             conn.verify_callback(None, cert, 0, 0, 1)
             self.fail('Failed to raise assertion.')
         except exc.SSLCertificateError:
@@ -205,7 +224,7 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         # The expected cert should have CN=0.0.0.0
         self.assertEqual('0.0.0.0', cert.get_subject().commonName)
         try:
-            conn = http.VerifiedHTTPSConnection('mismatch.example.com', 0)
+            conn = https.VerifiedHTTPSConnection('mismatch.example.com', 0)
         except Exception:
             self.fail('Failed to init VerifiedHTTPSConnection.')
 
@@ -223,10 +242,9 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         self.assertEqual('openstack.example.com',
                          cert.get_subject().commonName)
         try:
-            conn = http.VerifiedHTTPSConnection('openstack.example.com', 0)
+            conn = https.VerifiedHTTPSConnection('openstack.example.com', 0)
         except Exception:
             self.fail('Failed to init VerifiedHTTPSConnection.')
-
         self.assertRaises(exc.SSLCertificateError,
                           conn.verify_callback, None, cert, 0, 0, 1)
 
@@ -239,7 +257,7 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         key_file = 'fake.key'
         self.assertRaises(
             exc.SSLConfigurationError,
-            http.VerifiedHTTPSConnection, '127.0.0.1',
+            https.VerifiedHTTPSConnection, '127.0.0.1',
             0, key_file=key_file,
             cert_file=cert_file, cacert=cacert)
 
@@ -251,7 +269,7 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         cert_file = os.path.join(TEST_VAR_DIR, 'certificate.crt')
         cacert = os.path.join(TEST_VAR_DIR, 'ca.crt')
         try:
-            conn = http.VerifiedHTTPSConnection(
+            https.VerifiedHTTPSConnection(
                 '127.0.0.1', 0,
                 key_file=key_file,
                 cert_file=cert_file,
@@ -267,7 +285,7 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         cert_file = os.path.join(TEST_VAR_DIR, 'certificate.crt')
         cacert = os.path.join(TEST_VAR_DIR, 'ca.crt')
         try:
-            conn = http.VerifiedHTTPSConnection(
+            https.VerifiedHTTPSConnection(
                 '127.0.0.1', 0,
                 key_file=key_file,
                 cert_file=cert_file,
@@ -289,9 +307,9 @@ class TestVerifiedHTTPSConnection(testtools.TestCase):
         cert_file = cert_file.encode('ascii', 'strict').decode('utf-8')
         cacert = cacert.encode('ascii', 'strict').decode('utf-8')
         try:
-            conn = http.VerifiedHTTPSConnection('127.0.0.1', 0,
-                                                key_file=key_file,
-                                                cert_file=cert_file,
-                                                cacert=cacert)
+            https.VerifiedHTTPSConnection('127.0.0.1', 0,
+                                          key_file=key_file,
+                                          cert_file=cert_file,
+                                          cacert=cacert)
         except exc.SSLConfigurationError:
             self.fail('Failed to init VerifiedHTTPSConnection.')

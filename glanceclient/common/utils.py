@@ -16,6 +16,8 @@
 from __future__ import print_function
 
 import errno
+import hashlib
+import json
 import os
 import re
 import sys
@@ -45,7 +47,8 @@ def arg(*args, **kwargs):
     return _decorator
 
 
-def schema_args(schema_getter, omit=[]):
+def schema_args(schema_getter, omit=None):
+    omit = omit or []
     typemap = {
         'string': str,
         'integer': int,
@@ -104,13 +107,20 @@ def pretty_choice_list(l):
     return ', '.join("'%s'" % i for i in l)
 
 
-def print_list(objs, fields, formatters={}):
+def print_list(objs, fields, formatters=None, field_settings=None):
+    formatters = formatters or {}
+    field_settings = field_settings or {}
     pt = prettytable.PrettyTable([f for f in fields], caching=False)
     pt.align = 'l'
 
     for o in objs:
         row = []
         for field in fields:
+            if field in field_settings:
+                for setting, value in six.iteritems(field_settings[field]):
+                    setting_dict = getattr(pt, setting)
+                    setting_dict[field] = value
+
             if field in formatters:
                 row.append(formatters[field](o))
             else:
@@ -126,7 +136,10 @@ def print_dict(d, max_column_width=80):
     pt = prettytable.PrettyTable(['Property', 'Value'], caching=False)
     pt.align = 'l'
     pt.max_width = max_column_width
-    [pt.add_row(list(r)) for r in six.iteritems(d)]
+    for k, v in six.iteritems(d):
+        if isinstance(v, (dict, list)):
+            v = json.dumps(v)
+        pt.add_row([k, v])
     print(strutils.safe_encode(pt.get_string(sortby='Property')))
 
 
@@ -335,3 +348,22 @@ def print_image(image_obj, max_col_width=None):
         print_dict(image, max_column_width=max_col_width)
     else:
         print_dict(image)
+
+
+def integrity_iter(iter, checksum):
+    """
+    Check image data integrity.
+
+    :raises: IOError
+    """
+    md5sum = hashlib.md5()
+    for chunk in iter:
+        yield chunk
+        if isinstance(chunk, six.string_types):
+            chunk = six.b(chunk)
+        md5sum.update(chunk)
+    md5sum = md5sum.hexdigest()
+    if md5sum != checksum:
+        raise IOError(errno.EPIPE,
+                      'Corrupt image download. Checksum was %s expected %s' %
+                      (md5sum, checksum))
