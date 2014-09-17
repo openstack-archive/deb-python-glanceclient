@@ -5,7 +5,7 @@ python-glanceclient (1:0.14.1-1) experimental; urgency=medium
 
  -- Thomas Goirand <zigo@debian.org>  Wed, 15 Oct 2014 16:19:34 +0800
 
-python-glanceclient (1:0.14.0-1) unstable; urgency=medium
+python-glanceclient (1:0.14.0-1) experimental; urgency=medium
 
   * New upstream release.
   * Uploading to experimental before the freeze of Jessie.
