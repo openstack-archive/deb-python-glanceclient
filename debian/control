@@ -37,7 +37,7 @@ Build-Depends-Indep: python-babel (>= 1.3),
                      python-warlock (>= 1.0.1),
                      subunit,
                      testrepository (>= 0.0.18)
-Standards-Version: 3.9.5
+Standards-Version: 3.9.6
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-glanceclient.git;a=summary
 Vcs-Git: git://anonscm.debian.org/openstack/python-glanceclient.git
 Homepage: http://glance.openstack.org

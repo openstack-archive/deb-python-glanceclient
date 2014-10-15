@@ -2,6 +2,7 @@ python-glanceclient (1:0.14.1-1) experimental; urgency=medium
 
   * New upstream release.
   * Updated (build-)depends for this new release.
+  * Standards-Version is now 3.9.6 (no change).
 
  -- Thomas Goirand <zigo@debian.org>  Wed, 15 Oct 2014 16:19:34 +0800
 
