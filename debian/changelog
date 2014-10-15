@@ -1,4 +1,4 @@
-python-glanceclient (1:0.14.1-1) unstable; urgency=medium
+python-glanceclient (1:0.14.1-1) experimental; urgency=medium
 
   * New upstream release.
 
