@@ -21,6 +21,7 @@ import json
 import os
 import re
 import sys
+import threading
 import uuid
 
 import six
@@ -35,6 +36,10 @@ import prettytable
 from glanceclient import exc
 from glanceclient.openstack.common import importutils
 from glanceclient.openstack.common import strutils
+
+_memoized_property_lock = threading.Lock()
+
+SENSITIVE_HEADERS = ('X-Auth-Token', )
 
 
 # Decorator for cli-args
@@ -367,3 +372,28 @@ def integrity_iter(iter, checksum):
         raise IOError(errno.EPIPE,
                       'Corrupt image download. Checksum was %s expected %s' %
                       (md5sum, checksum))
+
+
+def memoized_property(fn):
+    attr_name = '_lazy_once_' + fn.__name__
+
+    @property
+    def _memoized_property(self):
+        if hasattr(self, attr_name):
+            return getattr(self, attr_name)
+        else:
+            with _memoized_property_lock:
+                if not hasattr(self, attr_name):
+                    setattr(self, attr_name, fn(self))
+            return getattr(self, attr_name)
+    return _memoized_property
+
+
+def safe_header(name, value):
+    if name in SENSITIVE_HEADERS:
+        v = value.encode('utf-8')
+        h = hashlib.sha1(v)
+        d = h.hexdigest()
+        return name, "{SHA1}%s" % d
+    else:
+        return name, value
