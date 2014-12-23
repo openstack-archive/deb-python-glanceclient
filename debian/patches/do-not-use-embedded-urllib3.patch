@@ -8,10 +8,12 @@ Author: Thomas Goirand <zigo@debian.org>
 Forwarded: no
 Last-Update: 2014-09-17
 
---- python-glanceclient-0.14.0.orig/glanceclient/common/http.py
-+++ python-glanceclient-0.14.0/glanceclient/common/http.py
-@@ -19,7 +19,7 @@ import socket
- 
+Index: python-glanceclient/glanceclient/common/http.py
+===================================================================
+--- python-glanceclient.orig/glanceclient/common/http.py	2014-12-23 16:23:23.000000000 +0800
++++ python-glanceclient/glanceclient/common/http.py	2014-12-23 16:26:47.000000000 +0800
+@@ -20,7 +20,7 @@
+ from oslo.utils import netutils
  import requests
  try:
 -    from requests.packages.urllib3.exceptions import ProtocolError
@@ -19,8 +21,10 @@ Last-Update: 2014-09-17
  except ImportError:
      ProtocolError = requests.exceptions.ConnectionError
  import six
---- python-glanceclient-0.14.0.orig/tests/test_ssl.py
-+++ python-glanceclient-0.14.0/tests/test_ssl.py
+Index: python-glanceclient/tests/test_ssl.py
+===================================================================
+--- python-glanceclient.orig/tests/test_ssl.py	2014-12-23 16:23:23.000000000 +0800
++++ python-glanceclient/tests/test_ssl.py	2014-12-23 16:26:47.000000000 +0800
 @@ -16,7 +16,10 @@
  import os
  
