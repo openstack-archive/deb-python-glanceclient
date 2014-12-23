@@ -15,6 +15,8 @@
 #    under the License.
 import json
 import mock
+import os
+import tempfile
 import testtools
 
 from glanceclient.common import utils
@@ -64,7 +66,8 @@ class ShellV2Test(testtools.TestCase):
             'member_status': 'Fake',
             'owner': 'test',
             'checksum': 'fake_checksum',
-            'tag': 'fake tag'
+            'tag': 'fake tag',
+            'properties': []
         }
         args = self._make_args(input)
         with mock.patch.object(self.gc.images, 'list') as mocked_list:
@@ -80,6 +83,36 @@ class ShellV2Test(testtools.TestCase):
                 'tag': 'fake tag'
             }
             mocked_list.assert_called_once_with(page_size=18,
+                                                filters=exp_img_filters)
+            utils.print_list.assert_called_once_with({}, ['ID', 'Name'])
+
+    def test_do_image_list_with_property_filter(self):
+        input = {
+            'page_size': 1,
+            'visibility': True,
+            'member_status': 'Fake',
+            'owner': 'test',
+            'checksum': 'fake_checksum',
+            'tag': 'fake tag',
+            'properties': ['os_distro=NixOS', 'architecture=x86_64']
+        }
+        args = self._make_args(input)
+        with mock.patch.object(self.gc.images, 'list') as mocked_list:
+            mocked_list.return_value = {}
+
+            test_shell.do_image_list(self.gc, args)
+
+            exp_img_filters = {
+                'owner': 'test',
+                'member_status': 'Fake',
+                'visibility': True,
+                'checksum': 'fake_checksum',
+                'tag': 'fake tag',
+                'os_distro': 'NixOS',
+                'architecture': 'x86_64'
+            }
+
+            mocked_list.assert_called_once_with(page_size=1,
                                                 filters=exp_img_filters)
             utils.print_list.assert_called_once_with({}, ['ID', 'Name'])
 
@@ -118,6 +151,47 @@ class ShellV2Test(testtools.TestCase):
             utils.print_dict.assert_called_once_with({
                 'id': 'pass', 'name': 'IMG-01', 'disk_format': 'vhd',
                 'container_format': 'bare'})
+
+    def test_do_image_create_with_file(self):
+        try:
+            file_name = None
+            with open(tempfile.mktemp(), 'w+') as f:
+                f.write('Some data here')
+                f.flush()
+                f.seek(0)
+                file_name = f.name
+            temp_args = {'name': 'IMG-01',
+                         'disk_format': 'vhd',
+                         'container_format': 'bare',
+                         'file': file_name,
+                         'progress': False}
+            args = self._make_args(temp_args)
+            with mock.patch.object(self.gc.images, 'create') as mocked_create:
+                with mock.patch.object(self.gc.images, 'get') as mocked_get:
+
+                    ignore_fields = ['self', 'access', 'schema']
+                    expect_image = dict([(field, field) for field in
+                                         ignore_fields])
+                    expect_image['id'] = 'pass'
+                    expect_image['name'] = 'IMG-01'
+                    expect_image['disk_format'] = 'vhd'
+                    expect_image['container_format'] = 'bare'
+                    mocked_create.return_value = expect_image
+                    mocked_get.return_value = expect_image
+
+                    test_shell.do_image_create(self.gc, args)
+
+                    temp_args.pop('file', None)
+                    mocked_create.assert_called_once_with(**temp_args)
+                    mocked_get.assert_called_once_with('pass')
+                    utils.print_dict.assert_called_once_with({
+                        'id': 'pass', 'name': 'IMG-01', 'disk_format': 'vhd',
+                        'container_format': 'bare'})
+        finally:
+            try:
+                os.remove(f.name)
+            except Exception:
+                pass
 
     def test_do_image_create_with_user_props(self):
         args = self._make_args({'name': 'IMG-01',

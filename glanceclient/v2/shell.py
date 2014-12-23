@@ -16,6 +16,7 @@
 from glanceclient.common import progressbar
 from glanceclient.common import utils
 from glanceclient import exc
+from glanceclient.v2 import tasks
 import json
 import os
 from os.path import expanduser
@@ -34,10 +35,18 @@ def get_image_schema():
     return IMAGE_SCHEMA
 
 
-@utils.schema_args(get_image_schema)
+@utils.schema_args(get_image_schema, omit=['created_at', 'updated_at', 'file',
+                                           'checksum', 'virtual_size', 'size',
+                                           'status', 'schema', 'direct_url'])
 @utils.arg('--property', metavar="<key=value>", action='append',
            default=[], help=('Arbitrary property to associate with image.'
                              ' May be used multiple times.'))
+@utils.arg('--file', metavar='<FILE>',
+           help='Local file to save downloaded image data to. '
+                'If this is not specified the image data will be '
+                'written to stdout.')
+@utils.arg('--progress', action='store_true', default=False,
+           help='Show upload progress bar.')
 def do_image_create(gc, args):
     """Create a new image."""
     schema = gc.schemas.get("image")
@@ -52,12 +61,26 @@ def do_image_create(gc, args):
         key, value = datum.split('=', 1)
         fields[key] = value
 
+    file_name = fields.pop('file', None)
+    if file_name is not None and os.access(file_name, os.R_OK) is False:
+        utils.exit("File %s does not exist or user does not have read "
+                   "privileges to it" % file_name)
     image = gc.images.create(**fields)
-    utils.print_image(image)
+    try:
+        if file_name is not None:
+            args.id = image['id']
+            args.size = None
+            do_image_upload(gc, args)
+            image = gc.images.get(args.id)
+    finally:
+        utils.print_image(image)
 
 
 @utils.arg('id', metavar='<IMAGE_ID>', help='ID of image to update.')
-@utils.schema_args(get_image_schema, omit=['id', 'locations', 'tags'])
+@utils.schema_args(get_image_schema, omit=['id', 'locations', 'created_at',
+                                           'updated_at', 'file', 'checksum',
+                                           'virtual_size', 'size', 'status',
+                                           'schema', 'direct_url', 'tags'])
 @utils.arg('--property', metavar="<key=value>", action='append',
            default=[], help=('Arbitrary property to associate with image.'
                              ' May be used multiple times.'))
@@ -92,6 +115,9 @@ def do_image_update(gc, args):
            help='The status of images to display.')
 @utils.arg('--owner', metavar='<OWNER>',
            help='Display images owned by <OWNER>.')
+@utils.arg('--property-filter', metavar='<KEY=VALUE>',
+           help="Filter images by a user-defined image property.",
+           action='append', dest='properties', default=[])
 @utils.arg('--checksum', metavar='<CHECKSUM>',
            help='Displays images that match the checksum.')
 @utils.arg('--tag', metavar='<TAG>', action='append',
@@ -100,6 +126,12 @@ def do_image_list(gc, args):
     """List images you can access."""
     filter_keys = ['visibility', 'member_status', 'owner', 'checksum', 'tag']
     filter_items = [(key, getattr(args, key)) for key in filter_keys]
+    if args.properties:
+        filter_properties = [prop.split('=', 1) for prop in args.properties]
+        if False in (len(pair) == 2 for pair in filter_properties):
+            utils.exit('Argument --property-filter expected properties in the'
+                       ' format KEY=VALUE')
+        filter_items += filter_properties
     filters = dict([item for item in filter_items if item[1] is not None])
 
     kwargs = {'filters': filters}
@@ -689,3 +721,67 @@ def do_md_object_list(gc, args):
         }
     }
     utils.print_list(objects, columns, field_settings=column_settings)
+
+
+@utils.arg('--sort-key', default='status',
+           choices=tasks.SORT_KEY_VALUES,
+           help='Sort task list by specified field.')
+@utils.arg('--sort-dir', default='desc',
+           choices=tasks.SORT_DIR_VALUES,
+           help='Sort task list in specified direction.')
+@utils.arg('--page-size', metavar='<SIZE>', default=None, type=int,
+           help='Number of tasks to request in each paginated request.')
+@utils.arg('--type', metavar='<TYPE>',
+           help='Filter tasks to those that have this type.')
+@utils.arg('--status', metavar='<STATUS>',
+           help='Filter tasks to those that have this status.')
+def do_task_list(gc, args):
+    """List tasks you can access."""
+    filter_keys = ['type', 'status']
+    filter_items = [(key, getattr(args, key)) for key in filter_keys]
+    filters = dict([item for item in filter_items if item[1] is not None])
+
+    kwargs = {'filters': filters}
+    if args.page_size is not None:
+        kwargs['page_size'] = args.page_size
+
+    kwargs['sort_key'] = args.sort_key
+    kwargs['sort_dir'] = args.sort_dir
+
+    tasks = gc.tasks.list(**kwargs)
+
+    columns = ['ID', 'Type', 'Status', 'Owner']
+    utils.print_list(tasks, columns)
+
+
+@utils.arg('id', metavar='<TASK_ID>', help='ID of task to describe.')
+def do_task_show(gc, args):
+    """Describe a specific task."""
+    task = gc.tasks.get(args.id)
+    ignore = ['self', 'schema']
+    task = dict([item for item in task.iteritems() if item[0] not in ignore])
+    utils.print_dict(task)
+
+
+@utils.arg('--type', metavar='<TYPE>',
+           help='Type of Task. Please refer to Glance schema or documentation'
+           ' to see which tasks are supported.')
+@utils.arg('--input', metavar='<STRING>', default='{}',
+           help='Parameters of the task to be launched')
+def do_task_create(gc, args):
+    """Create a new task."""
+    if not (args.type and args.input):
+        utils.exit('Unable to create task. Specify task type and input.')
+    else:
+        try:
+            input = json.loads(args.input)
+        except ValueError:
+            utils.exit('Failed to parse the "input" parameter. Must be a '
+                       'valid JSON object.')
+
+        task_values = {'type': args.type, 'input': input}
+        task = gc.tasks.create(**task_values)
+        ignore = ['self', 'schema']
+        task = dict([item for item in task.iteritems()
+                     if item[0] not in ignore])
+        utils.print_dict(task)

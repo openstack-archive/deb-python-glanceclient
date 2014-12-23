@@ -14,6 +14,7 @@
 #    under the License.
 import json
 
+import mock
 from mox3 import mox
 import requests
 import six
@@ -75,6 +76,47 @@ class TestClient(testtools.TestCase):
         self.assertTrue(http_client_object.identity_headers.
                         get('X-Auth-Token') is None)
 
+    def test_identity_headers_and_no_token_in_session_header(self):
+        # Tests that if token or X-Auth-Token are not provided in the kwargs
+        # when creating the http client, the session headers don't contain
+        # the X-Auth-Token key.
+        identity_headers = {
+            'X-User-Id': 'user',
+            'X-Tenant-Id': 'tenant',
+            'X-Roles': 'roles',
+            'X-Identity-Status': 'Confirmed',
+            'X-Service-Catalog': 'service_catalog',
+        }
+        kwargs = {'identity_headers': identity_headers}
+        http_client_object = http.HTTPClient(self.endpoint, **kwargs)
+        self.assertIsNone(http_client_object.auth_token)
+        self.assertNotIn('X-Auth-Token', http_client_object.session.headers)
+
+    def test_identity_headers_are_passed(self):
+        # Tests that if token or X-Auth-Token are not provided in the kwargs
+        # when creating the http client, the session headers don't contain
+        # the X-Auth-Token key.
+        identity_headers = {
+            'X-User-Id': 'user',
+            'X-Tenant-Id': 'tenant',
+            'X-Roles': 'roles',
+            'X-Identity-Status': 'Confirmed',
+            'X-Service-Catalog': 'service_catalog',
+        }
+        kwargs = {'identity_headers': identity_headers}
+        http_client = http.HTTPClient(self.endpoint, **kwargs)
+
+        def check_headers(*args, **kwargs):
+            headers = kwargs.get('headers')
+            for k, v in six.iteritems(identity_headers):
+                self.assertEqual(v, headers[k])
+
+            return utils.FakeResponse({}, six.StringIO('{}'))
+
+        with mock.patch.object(http_client.session, 'request') as mreq:
+            mreq.side_effect = check_headers
+            http_client.get('http://example.com:9292/v1/images/my-image')
+
     def test_connection_refused(self):
         """
         Should receive a CommunicationError if connection refused.
@@ -117,7 +159,7 @@ class TestClient(testtools.TestCase):
 
         headers = {"test": u'ni\xf1o'}
         resp, body = self.client.get('/v1/images/detail', headers=headers)
-        self.assertEqual(resp, fake)
+        self.assertEqual(fake, resp)
 
     def test_headers_encoding(self):
         value = u'ni\xf1o'
@@ -142,7 +184,7 @@ class TestClient(testtools.TestCase):
         self.mock.ReplayAll()
 
         resp, body = self.client.get('/v1/images/detail', headers=headers)
-        self.assertEqual(resp, fake)
+        self.assertEqual(fake, resp)
 
     def test_parse_endpoint(self):
         endpoint = 'http://example.com:9292'
@@ -175,7 +217,7 @@ class TestClient(testtools.TestCase):
         headers = {"test": u'chunked_request'}
         resp, body = self.client.post('/v1/images/',
                                       headers=headers, data=data)
-        self.assertEqual(resp, fake)
+        self.assertEqual(fake, resp)
 
     def test_http_json(self):
         data = {"test": "json_request"}
@@ -213,7 +255,7 @@ class TestClient(testtools.TestCase):
         resp, body = self.client.post('/v1/images/',
                                       headers=headers,
                                       data=data)
-        self.assertEqual(resp, fake)
+        self.assertEqual(fake, resp)
 
     def test_http_chunked_response(self):
         headers = {"Content-Type": "application/octet-stream"}

@@ -81,6 +81,17 @@ def schema_args(schema_getter, omit=None):
                 kwargs = {}
 
                 type_str = property.get('type', 'string')
+
+                if isinstance(type_str, list):
+                    # NOTE(flaper87): This means the server has
+                    # returned something like `['null', 'string']`,
+                    # therfore we use the first non-`null` type as
+                    # the valid type.
+                    for t in type_str:
+                        if t != 'null':
+                            type_str = t
+                            break
+
                 if type_str == 'array':
                     items = property.get('items')
                     kwargs['type'] = typemap.get(items.get('type'))
@@ -97,8 +108,13 @@ def schema_args(schema_getter, omit=None):
                 if 'enum' in property:
                     if len(description):
                         description += " "
-                    description += ("Valid values: " +
-                                    ', '.join(property.get('enum')))
+
+                    # NOTE(flaper87): Make sure all values are `str/unicode`
+                    # for the `join` to succeed. Enum types can also be `None`
+                    # therfore, join's call would fail without the following
+                    # list comprehension
+                    vals = [six.text_type(val) for val in property.get('enum')]
+                    description += ('Valid values: ' + ', '.join(vals))
                 kwargs['help'] = description
 
                 func.__dict__.setdefault('arguments',
@@ -335,14 +351,22 @@ def get_data_file(args):
 
 def strip_version(endpoint):
     """Strip version from the last component of endpoint if present."""
+    # NOTE(flaper87): This shouldn't be necessary if
+    # we make endpoint the first argument. However, we
+    # can't do that just yet because we need to keep
+    # backwards compatibility.
+    if not isinstance(endpoint, six.string_types):
+        raise ValueError("Expected endpoint")
+
+    version = None
     # Get rid of trailing '/' if present
-    if endpoint.endswith('/'):
-        endpoint = endpoint[:-1]
+    endpoint = endpoint.rstrip('/')
     url_bits = endpoint.split('/')
     # regex to match 'v1' or 'v2.0' etc
     if re.match('v\d+\.?\d*', url_bits[-1]):
+        version = float(url_bits[-1].lstrip('v'))
         endpoint = '/'.join(url_bits[:-1])
-    return endpoint
+    return endpoint, version
 
 
 def print_image(image_obj, max_col_width=None):

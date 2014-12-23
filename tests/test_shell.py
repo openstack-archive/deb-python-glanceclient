@@ -16,8 +16,11 @@
 
 import argparse
 import os
+import sys
 
+import fixtures
 import mock
+import six
 
 from glanceclient import exc
 from glanceclient import shell as openstack_shell
@@ -65,6 +68,11 @@ class ShellTest(utils.TestCase):
     # expected auth plugin to invoke
     auth_plugin = 'keystoneclient.auth.identity.v2.Password'
 
+    # Patch os.environ to avoid required auth info
+    def make_env(self, exclude=None, fake_env=FAKE_V2_ENV):
+        env = dict((k, v) for k, v in fake_env.items() if k != exclude)
+        self.useFixture(fixtures.MonkeyPatch('os.environ', env))
+
     def setUp(self):
         super(ShellTest, self).setUp()
         global _old_env
@@ -78,6 +86,26 @@ class ShellTest(utils.TestCase):
         super(ShellTest, self).tearDown()
         global _old_env
         os.environ = _old_env
+
+    def shell(self, argstr, exitcodes=(0,)):
+        orig = sys.stdout
+        orig_stderr = sys.stderr
+        try:
+            sys.stdout = six.StringIO()
+            sys.stderr = six.StringIO()
+            _shell = openstack_shell.OpenStackImagesShell()
+            _shell.main(argstr.split())
+        except SystemExit:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            self.assertIn(exc_value.code, exitcodes)
+        finally:
+            stdout = sys.stdout.getvalue()
+            sys.stdout.close()
+            sys.stdout = orig
+            stderr = sys.stderr.getvalue()
+            sys.stderr.close()
+            sys.stderr = orig_stderr
+        return (stdout, stderr)
 
     def test_help_unknown_command(self):
         shell = openstack_shell.OpenStackImagesShell()
@@ -116,8 +144,8 @@ class ShellTest(utils.TestCase):
         shell(args)
         assert mock_versioned_client.called
         ((api_version, args), kwargs) = mock_versioned_client.call_args
-        self.assertEqual(args.os_cert, 'mycert')
-        self.assertEqual(args.os_key, 'mykey')
+        self.assertEqual('mycert', args.os_cert)
+        self.assertEqual('mykey', args.os_key)
 
         # make sure we get the same thing with --cert-file and --key-file
         args = '--cert-file mycertfile --key-file mykeyfile image-list'
@@ -125,8 +153,8 @@ class ShellTest(utils.TestCase):
         glance_shell.main(args.split())
         assert mock_versioned_client.called
         ((api_version, args), kwargs) = mock_versioned_client.call_args
-        self.assertEqual(args.os_cert, 'mycertfile')
-        self.assertEqual(args.os_key, 'mykeyfile')
+        self.assertEqual('mycertfile', args.os_cert)
+        self.assertEqual('mykeyfile', args.os_key)
 
     @mock.patch('glanceclient.v1.client.Client')
     def test_no_auth_with_token_and_image_url_with_v1(self, v1_client):
@@ -138,8 +166,8 @@ class ShellTest(utils.TestCase):
         glance_shell.main(args.split())
         assert v1_client.called
         (args, kwargs) = v1_client.call_args
-        self.assertEqual(kwargs['token'], 'mytoken')
-        self.assertEqual(args[0], 'https://image:1234/v1')
+        self.assertEqual('mytoken', kwargs['token'])
+        self.assertEqual('https://image:1234', args[0])
 
     @mock.patch.object(openstack_shell.OpenStackImagesShell, '_cache_schemas')
     def test_no_auth_with_token_and_image_url_with_v2(self,
@@ -153,8 +181,8 @@ class ShellTest(utils.TestCase):
             glance_shell = openstack_shell.OpenStackImagesShell()
             glance_shell.main(args.split())
             ((args), kwargs) = v2_client.call_args
-            self.assertEqual(args[0], 'https://image:1234/v2')
-            self.assertEqual(kwargs['token'], 'mytoken')
+            self.assertEqual('https://image:1234', args[0])
+            self.assertEqual('mytoken', kwargs['token'])
 
     def _assert_auth_plugin_args(self, mock_auth_plugin):
         # make sure our auth plugin is invoked with the correct args
@@ -224,6 +252,27 @@ class ShellTest(utils.TestCase):
             glance_shell.main(args.split())
             self._assert_auth_plugin_args(mock_auth_plugin)
 
+    @mock.patch('sys.stdin', side_effect=mock.MagicMock)
+    @mock.patch('getpass.getpass', return_value='password')
+    def test_password_prompted_with_v2(self, mock_getpass, mock_stdin):
+        glance_shell = openstack_shell.OpenStackImagesShell()
+        self.make_env(exclude='OS_PASSWORD')
+        # We will get a Connection Refused because there is no keystone.
+        self.assertRaises(ks_exc.ConnectionRefused,
+                          glance_shell.main, ['image-list'])
+        # Make sure we are actually prompted.
+        mock_getpass.assert_called_with('OS Password: ')
+
+    @mock.patch('sys.stdin', side_effect=mock.MagicMock)
+    @mock.patch('getpass.getpass', side_effect=EOFError)
+    def test_password_prompted_ctrlD_with_v2(self, mock_getpass, mock_stdin):
+        glance_shell = openstack_shell.OpenStackImagesShell()
+        self.make_env(exclude='OS_PASSWORD')
+        # We should get Command Error because we mock Ctl-D.
+        self.assertRaises(exc.CommandError, glance_shell.main, ['image-list'])
+        # Make sure we are actually prompted.
+        mock_getpass.assert_called_with('OS Password: ')
+
 
 class ShellTestWithKeystoneV3Auth(ShellTest):
     # auth environment to use
@@ -284,6 +333,22 @@ class ShellTestWithKeystoneV3Auth(ShellTest):
             keystone_client_fixtures.BASE_URL)
         glance_shell = openstack_shell.OpenStackImagesShell()
         self.assertRaises(exc.CommandError, glance_shell.main, args.split())
+
+    def test_bash_completion(self):
+        stdout, stderr = self.shell('bash_completion')
+        # just check we have some output
+        required = [
+            '--status',
+            'image-create',
+            'help',
+            '--size']
+        for r in required:
+            self.assertIn(r, stdout.split())
+        avoided = [
+            'bash_completion',
+            'bash-completion']
+        for r in avoided:
+            self.assertNotIn(r, stdout.split())
 
 
 class ShellCacheSchemaTest(utils.TestCase):

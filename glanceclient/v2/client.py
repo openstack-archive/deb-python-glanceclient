@@ -21,6 +21,7 @@ from glanceclient.v2 import image_tags
 from glanceclient.v2 import images
 from glanceclient.v2 import metadefs
 from glanceclient.v2 import schemas
+from glanceclient.v2 import tasks
 
 
 class Client(object):
@@ -34,8 +35,10 @@ class Client(object):
     """
 
     def __init__(self, endpoint, *args, **kwargs):
-        self.http_client = http.HTTPClient(utils.strip_version(endpoint),
-                                           *args, **kwargs)
+        endpoint, version = utils.strip_version(endpoint)
+        self.version = version or 2.0
+        self.http_client = http.HTTPClient(endpoint, *args, **kwargs)
+
         self.schemas = schemas.Controller(self.http_client)
 
         self.images = images.Controller(self.http_client, self.schemas)
@@ -43,6 +46,8 @@ class Client(object):
                                                 self.schemas)
         self.image_members = image_members.Controller(self.http_client,
                                                       self.schemas)
+
+        self.tasks = tasks.Controller(self.http_client, self.schemas)
 
         self.metadefs_resource_type = (
             metadefs.ResourceTypeController(self.http_client, self.schemas))

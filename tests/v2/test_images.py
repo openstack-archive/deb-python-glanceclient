@@ -14,7 +14,6 @@
 #    under the License.
 
 import errno
-import json
 
 import six
 import testtools
@@ -58,6 +57,7 @@ data_fixtures = {
                             'required': ['url', 'metadata'],
                         },
                     },
+                    'color': {'type': 'string', 'is_base': False},
                 },
                 'additionalProperties': {'type': 'string'}
             },
@@ -125,6 +125,7 @@ data_fixtures = {
                 'name': 'image-3',
                 'barney': 'rubble',
                 'george': 'jetson',
+                'color': 'red',
             },
         ),
         'PATCH': (
@@ -224,7 +225,7 @@ data_fixtures = {
             {'images': []},
         ),
     },
-    '/v2/images?owner=%s&limit=%d' % (_OWNER_ID, images.DEFAULT_PAGE_SIZE): {
+    '/v2/images?limit=%d&owner=%s' % (images.DEFAULT_PAGE_SIZE, _OWNER_ID): {
         'GET': (
             {},
             {'images': [
@@ -234,14 +235,14 @@ data_fixtures = {
             ]},
         ),
     },
-    '/v2/images?owner=%s&limit=%d' % (_BOGUS_ID, images.DEFAULT_PAGE_SIZE): {
+    '/v2/images?limit=%d&owner=%s' % (images.DEFAULT_PAGE_SIZE, _BOGUS_ID): {
         'GET': (
             {},
             {'images': []},
         ),
     },
-    '/v2/images?owner=%s&limit=%d&member_status=pending&visibility=shared'
-    % (_BOGUS_ID, images.DEFAULT_PAGE_SIZE): {
+    '/v2/images?limit=%d&member_status=pending&owner=%s&visibility=shared'
+    % (images.DEFAULT_PAGE_SIZE, _BOGUS_ID): {
         'GET': (
             {},
             {'images': [
@@ -345,6 +346,25 @@ data_fixtures = {
             '',
         )
     },
+    '/v2/images?limit=%d&os_distro=NixOS' % images.DEFAULT_PAGE_SIZE: {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': '8b052954-c76c-4e02-8e90-be89a70183a8',
+                    'name': 'image-5',
+                    'os_distro': 'NixOS',
+                },
+            ]},
+        ),
+    },
+    '/v2/images?limit=%d&my_little_property=cant_be_this_cute' %
+    images.DEFAULT_PAGE_SIZE: {
+        'GET': (
+            {},
+            {'images': []},
+        ),
+    },
 }
 
 
@@ -367,7 +387,8 @@ schema_fixtures = {
                             },
                             'required': ['url', 'metadata'],
                         }
-                    }
+                    },
+                    'color': {'type': 'string', 'is_base': False},
                 },
                 'additionalProperties': {'type': 'string'}
             }
@@ -400,33 +421,33 @@ class TestController(testtools.TestCase):
         self.assertEqual('image-2', images[1].name)
 
     def test_list_images_visibility_public(self):
-        filters = {'filters': dict([('visibility', 'public')])}
+        filters = {'filters': {'visibility': 'public'}}
         images = list(self.controller.list(**filters))
         self.assertEqual(_PUBLIC_ID, images[0].id)
 
     def test_list_images_visibility_private(self):
-        filters = {'filters': dict([('visibility', 'private')])}
+        filters = {'filters': {'visibility': 'private'}}
         images = list(self.controller.list(**filters))
         self.assertEqual(_PRIVATE_ID, images[0].id)
 
     def test_list_images_visibility_shared(self):
-        filters = {'filters': dict([('visibility', 'shared')])}
+        filters = {'filters': {'visibility': 'shared'}}
         images = list(self.controller.list(**filters))
         self.assertEqual(_SHARED_ID, images[0].id)
 
     def test_list_images_member_status_rejected(self):
-        filters = {'filters': dict([('member_status', 'rejected')])}
+        filters = {'filters': {'member_status': 'rejected'}}
         images = list(self.controller.list(**filters))
         self.assertEqual(_STATUS_REJECTED_ID, images[0].id)
 
     def test_list_images_for_owner(self):
-        filters = {'filters': dict([('owner', _OWNER_ID)])}
+        filters = {'filters': {'owner': _OWNER_ID}}
         images = list(self.controller.list(**filters))
         self.assertEqual(_OWNED_IMAGE_ID, images[0].id)
 
     def test_list_images_for_checksum_single_image(self):
         fake_id = '3a4560a1-e585-443e-9b39-553b46ec92d1'
-        filters = {'filters': dict([('checksum', _CHKSUM)])}
+        filters = {'filters': {'checksum': _CHKSUM}}
         images = list(self.controller.list(**filters))
         self.assertEqual(1, len(images))
         self.assertEqual('%s' % fake_id, images[0].id)
@@ -434,26 +455,26 @@ class TestController(testtools.TestCase):
     def test_list_images_for_checksum_multiple_images(self):
         fake_id1 = '2a4560b2-e585-443e-9b39-553b46ec92d1'
         fake_id2 = '6f99bf80-2ee6-47cf-acfe-1f1fabb7e810'
-        filters = {'filters': dict([('checksum', _CHKSUM1)])}
+        filters = {'filters': {'checksum': _CHKSUM1}}
         images = list(self.controller.list(**filters))
         self.assertEqual(2, len(images))
         self.assertEqual('%s' % fake_id1, images[0].id)
         self.assertEqual('%s' % fake_id2, images[1].id)
 
     def test_list_images_for_wrong_checksum(self):
-        filters = {'filters': dict([('checksum', 'wrong')])}
+        filters = {'filters': {'checksum': 'wrong'}}
         images = list(self.controller.list(**filters))
         self.assertEqual(0, len(images))
 
     def test_list_images_for_bogus_owner(self):
-        filters = {'filters': dict([('owner', _BOGUS_ID)])}
+        filters = {'filters': {'owner': _BOGUS_ID}}
         images = list(self.controller.list(**filters))
         self.assertEqual([], images)
 
     def test_list_images_for_bunch_of_filters(self):
-        filters = {'filters': dict([('owner', _BOGUS_ID),
-                                    ('visibility', 'shared'),
-                                    ('member_status', 'pending')])}
+        filters = {'filters': {'owner': _BOGUS_ID,
+                               'visibility': 'shared',
+                               'member_status': 'pending'}}
         images = list(self.controller.list(**filters))
         self.assertEqual(_EVERYTHING_ID, images[0].id)
 
@@ -474,7 +495,7 @@ class TestController(testtools.TestCase):
 
     def test_list_images_for_tag_single_image(self):
         img_id = '3a4560a1-e585-443e-9b39-553b46ec92d1'
-        filters = {'filters': dict([('tag', [_TAG1])])}
+        filters = {'filters': {'tag': [_TAG1]}}
         images = list(self.controller.list(**filters))
         self.assertEqual(1, len(images))
         self.assertEqual('%s' % img_id, images[0].id)
@@ -483,7 +504,7 @@ class TestController(testtools.TestCase):
     def test_list_images_for_tag_multiple_images(self):
         img_id1 = '2a4560b2-e585-443e-9b39-553b46ec92d1'
         img_id2 = '6f99bf80-2ee6-47cf-acfe-1f1fabb7e810'
-        filters = {'filters': dict([('tag', [_TAG2])])}
+        filters = {'filters': {'tag': [_TAG2]}}
         images = list(self.controller.list(**filters))
         self.assertEqual(2, len(images))
         self.assertEqual('%s' % img_id1, images[0].id)
@@ -491,13 +512,24 @@ class TestController(testtools.TestCase):
 
     def test_list_images_for_multi_tags(self):
         img_id1 = '2a4560b2-e585-443e-9b39-553b46ec92d1'
-        filters = {'filters': dict([('tag', [_TAG1, _TAG2])])}
+        filters = {'filters': {'tag': [_TAG1, _TAG2]}}
         images = list(self.controller.list(**filters))
         self.assertEqual(1, len(images))
         self.assertEqual('%s' % img_id1, images[0].id)
 
     def test_list_images_for_non_existent_tag(self):
-        filters = {'filters': dict([('tag', ['fake'])])}
+        filters = {'filters': {'tag': ['fake']}}
+        images = list(self.controller.list(**filters))
+        self.assertEqual(0, len(images))
+
+    def test_list_images_for_property(self):
+        filters = {'filters': dict([('os_distro', 'NixOS')])}
+        images = list(self.controller.list(**filters))
+        self.assertEqual(1, len(images))
+
+    def test_list_images_for_non_existent_property(self):
+        filters = {'filters': dict([('my_little_property',
+                                     'cant_be_this_cute')])}
         images = list(self.controller.list(**filters))
         self.assertEqual(0, len(images))
 
@@ -548,7 +580,7 @@ class TestController(testtools.TestCase):
                 'image_size': 3}
         expect = [('PUT', '/v2/images/%s/file' % image_id,
                   {'Content-Type': 'application/octet-stream'},
-                  body)]
+                  sorted(body.items()))]
         self.assertEqual(expect, self.api.calls)
 
     def test_data_without_checksum(self):
@@ -593,7 +625,8 @@ class TestController(testtools.TestCase):
         expect_hdrs = {
             'Content-Type': 'application/openstack-images-v2.1-json-patch',
         }
-        expect_body = '[{"path": "/name", "value": "pong", "op": "replace"}]'
+        expect_body = [[('op', 'replace'), ('path', '/name'),
+                        ('value', 'pong')]]
         expect = [
             ('GET', '/v2/images/%s' % image_id, {}, None),
             ('PATCH', '/v2/images/%s' % image_id, expect_hdrs, expect_body),
@@ -612,7 +645,7 @@ class TestController(testtools.TestCase):
         expect_hdrs = {
             'Content-Type': 'application/openstack-images-v2.1-json-patch',
         }
-        expect_body = '[{"path": "/finn", "value": "human", "op": "add"}]'
+        expect_body = [[('op', 'add'), ('path', '/finn'), ('value', 'human')]]
         expect = [
             ('GET', '/v2/images/%s' % image_id, {}, None),
             ('PATCH', '/v2/images/%s' % image_id, expect_hdrs, expect_body),
@@ -631,7 +664,7 @@ class TestController(testtools.TestCase):
         expect_hdrs = {
             'Content-Type': 'application/openstack-images-v2.1-json-patch',
         }
-        expect_body = '[{"path": "/barney", "op": "remove"}]'
+        expect_body = [[('op', 'remove'), ('path', '/barney')]]
         expect = [
             ('GET', '/v2/images/%s' % image_id, {}, None),
             ('PATCH', '/v2/images/%s' % image_id, expect_hdrs, expect_body),
@@ -652,8 +685,8 @@ class TestController(testtools.TestCase):
         expect_hdrs = {
             'Content-Type': 'application/openstack-images-v2.1-json-patch',
         }
-        expect_body = ('[{"path": "/barney", "value": "miller", '
-                       '"op": "replace"}]')
+        expect_body = ([[('op', 'replace'), ('path', '/barney'),
+                         ('value', 'miller')]])
         expect = [
             ('GET', '/v2/images/%s' % image_id, {}, None),
             ('PATCH', '/v2/images/%s' % image_id, expect_hdrs, expect_body),
@@ -674,7 +707,7 @@ class TestController(testtools.TestCase):
         expect_hdrs = {
             'Content-Type': 'application/openstack-images-v2.1-json-patch',
         }
-        expect_body = '[{"path": "/finn", "value": "human", "op": "add"}]'
+        expect_body = [[('op', 'add'), ('path', '/finn'), ('value', 'human')]]
         expect = [
             ('GET', '/v2/images/%s' % image_id, {}, None),
             ('PATCH', '/v2/images/%s' % image_id, expect_hdrs, expect_body),
@@ -691,6 +724,39 @@ class TestController(testtools.TestCase):
         params = {'name': 'pong', 'bad_prop': False}
         with testtools.ExpectedException(TypeError):
             self.controller.update(image_id, **params)
+
+    def test_update_add_custom_property(self):
+        image_id = '3a4560a1-e585-443e-9b39-553b46ec92d1'
+        params = {'color': 'red'}
+        image = self.controller.update(image_id, **params)
+        expect_hdrs = {
+            'Content-Type': 'application/openstack-images-v2.1-json-patch',
+        }
+        expect_body = [[('op', 'add'), ('path', '/color'), ('value', 'red')]]
+        expect = [
+            ('GET', '/v2/images/%s' % image_id, {}, None),
+            ('PATCH', '/v2/images/%s' % image_id, expect_hdrs, expect_body),
+            ('GET', '/v2/images/%s' % image_id, {}, None),
+        ]
+        self.assertEqual(expect, self.api.calls)
+        self.assertEqual(image_id, image.id)
+
+    def test_update_replace_custom_property(self):
+        image_id = 'e7e59ff6-fa2e-4075-87d3-1a1398a07dc3'
+        params = {'color': 'blue'}
+        image = self.controller.update(image_id, **params)
+        expect_hdrs = {
+            'Content-Type': 'application/openstack-images-v2.1-json-patch',
+        }
+        expect_body = [[('op', 'replace'), ('path', '/color'),
+                        ('value', 'blue')]]
+        expect = [
+            ('GET', '/v2/images/%s' % image_id, {}, None),
+            ('PATCH', '/v2/images/%s' % image_id, expect_hdrs, expect_body),
+            ('GET', '/v2/images/%s' % image_id, {}, None),
+        ]
+        self.assertEqual(expect, self.api.calls)
+        self.assertEqual(image_id, image.id)
 
     def test_location_ops_when_server_disabled_location_ops(self):
         # Location operations should not be allowed if server has not
@@ -720,10 +786,11 @@ class TestController(testtools.TestCase):
 
     def _patch_req(self, image_id, patch_body):
         c_type = 'application/openstack-images-v2.1-json-patch'
+        data = [sorted(d.items()) for d in patch_body]
         return ('PATCH',
                 '/v2/images/%s' % image_id,
                 {'Content-Type': c_type},
-                json.dumps(patch_body))
+                data)
 
     def test_add_location(self):
         image_id = 'a2b83adc-888e-11e3-8872-78acc0b951d8'

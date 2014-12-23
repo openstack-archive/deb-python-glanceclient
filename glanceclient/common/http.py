@@ -17,6 +17,7 @@ import copy
 import logging
 import socket
 
+from oslo.utils import netutils
 import requests
 try:
     from requests.packages.urllib3.exceptions import ProtocolError
@@ -39,7 +40,6 @@ from glanceclient.common import https
 from glanceclient.common.utils import safe_header
 from glanceclient import exc
 from glanceclient.openstack.common import importutils
-from glanceclient.openstack.common import network_utils
 from glanceclient.openstack.common import strutils
 
 osprofiler_web = importutils.try_import("osprofiler.web")
@@ -62,7 +62,9 @@ class HTTPClient(object):
 
         self.session = requests.Session()
         self.session.headers["User-Agent"] = USER_AGENT
-        self.session.headers["X-Auth-Token"] = self.auth_token
+
+        if self.auth_token:
+            self.session.headers["X-Auth-Token"] = self.auth_token
 
         self.timeout = float(kwargs.get('timeout', 600))
 
@@ -70,10 +72,12 @@ class HTTPClient(object):
             compression = kwargs.get('ssl_compression', True)
 
             if not compression:
-                self.session.mount("https://", https.HTTPSAdapter())
+                self.session.mount("glance+https://", https.HTTPSAdapter())
+                self.endpoint = 'glance+' + self.endpoint
 
-                self.session.verify = (kwargs.get('cacert', None),
-                                       kwargs.get('insecure', False))
+                self.session.verify = (
+                    kwargs.get('cacert', requests.certs.where()),
+                    kwargs.get('insecure', False))
 
             else:
                 if kwargs.get('insecure', False) is True:
@@ -87,7 +91,7 @@ class HTTPClient(object):
 
     @staticmethod
     def parse_endpoint(endpoint):
-        return network_utils.urlsplit(endpoint)
+        return netutils.urlsplit(endpoint)
 
     def log_curl_request(self, method, url, headers, data, kwargs):
         curl = ['curl -i -X %s' % method]
@@ -152,6 +156,10 @@ class HTTPClient(object):
         # Copy the kwargs so we can reuse the original in case of redirects
         headers = kwargs.pop("headers", {})
         headers = headers and copy.deepcopy(headers) or {}
+
+        if self.identity_headers:
+            for k, v in six.iteritems(self.identity_headers):
+                headers.setdefault(k, v)
 
         # Default Content-Type is octet-stream
         content_type = headers.get('Content-Type', 'application/octet-stream')

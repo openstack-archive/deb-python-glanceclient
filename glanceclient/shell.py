@@ -21,6 +21,7 @@ from __future__ import print_function
 
 import argparse
 import copy
+import getpass
 import json
 import logging
 import os
@@ -247,14 +248,19 @@ class OpenStackImagesShell(object):
 
         parser.add_argument('--os-image-url',
                             default=utils.env('OS_IMAGE_URL'),
-                            help='Defaults to env[OS_IMAGE_URL].')
+                            help=('Defaults to env[OS_IMAGE_URL]. '
+                                  'If the provided image url contains a '
+                                  'a version number and '
+                                  '`--os-image-api-version` is omitted '
+                                  'the version of the URL will be picked as '
+                                  'the image api version to use.'))
 
         parser.add_argument('--os_image_url',
                             help=argparse.SUPPRESS)
 
         parser.add_argument('--os-image-api-version',
                             default=utils.env('OS_IMAGE_API_VERSION',
-                                              default='1'),
+                                              default=None),
                             help='Defaults to env[OS_IMAGE_API_VERSION] or 1.')
 
         parser.add_argument('--os_image_api_version',
@@ -284,9 +290,17 @@ class OpenStackImagesShell(object):
 
         self.subcommands = {}
         subparsers = parser.add_subparsers(metavar='<subcommand>')
-        submodule = utils.import_versioned_module(version, 'shell')
+        try:
+            submodule = utils.import_versioned_module(version, 'shell')
+        except ImportError:
+            print('"%s" is not a supported API version. Example '
+                  'values are "1" or "2".' % version)
+            utils.exit()
+
         self._find_actions(subparsers, submodule)
         self._find_actions(subparsers, self)
+
+        self._add_bash_completion_subparser(subparsers)
 
         return parser
 
@@ -313,6 +327,13 @@ class OpenStackImagesShell(object):
             for (args, kwargs) in arguments:
                 subparser.add_argument(*args, **kwargs)
             subparser.set_defaults(func=callback)
+
+    def _add_bash_completion_subparser(self, subparsers):
+        subparser = subparsers.add_parser('bash_completion',
+                                          add_help=False,
+                                          formatter_class=HelpFormatter)
+        self.subcommands['bash_completion'] = subparser
+        subparser.set_defaults(func=self.do_bash_completion)
 
     def _get_image_url(self, args):
         """Translate the available url-related options into a single string.
@@ -439,10 +460,21 @@ class OpenStackImagesShell(object):
                       "env[OS_USERNAME]"))
 
             if not args.os_password:
-                raise exc.CommandError(
-                    _("You must provide a password via"
-                      " either --os-password or "
-                      "env[OS_PASSWORD]"))
+                # No password, If we've got a tty, try prompting for it
+                if hasattr(sys.stdin, 'isatty') and sys.stdin.isatty():
+                    # Check for Ctl-D
+                    try:
+                        args.os_password = getpass.getpass('OS Password: ')
+                    except EOFError:
+                        pass
+                # No password because we didn't have a tty or the
+                # user Ctl-D when prompted.
+                if not args.os_password:
+                    raise exc.CommandError(
+                        _("You must provide a password via "
+                          "either --os-password, "
+                          "env[OS_PASSWORD], "
+                          "or prompted response"))
 
             # Validate password flow auth
             project_info = (args.os_tenant_name or
@@ -497,7 +529,7 @@ class OpenStackImagesShell(object):
             service_type = args.os_service_type or 'image'
             endpoint = args.os_image_url or ks_session.get_endpoint(
                 service_type=service_type,
-                endpoint_type=endpoint_type,
+                interface=endpoint_type,
                 region_name=args.os_region_name)
 
         return endpoint, token
@@ -552,10 +584,22 @@ class OpenStackImagesShell(object):
         parser = self.get_base_parser()
         (options, args) = parser.parse_known_args(base_argv)
 
-        # build available subcommands based on version
-        api_version = options.os_image_api_version
+        try:
+            # NOTE(flaper87): Try to get the version from the
+            # image-url first. If no version was specified, fallback
+            # to the api-image-version arg. If both of these fail then
+            # fallback to the minimum supported one and let keystone
+            # do the magic.
+            endpoint = self._get_image_url(options)
+            endpoint, url_version = utils.strip_version(endpoint)
+        except ValueError:
+            # NOTE(flaper87): ValueError is raised if no endpoint is povided
+            url_version = None
 
-        if api_version == '2':
+        # build available subcommands based on version
+        api_version = int(options.os_image_api_version or url_version or 1)
+
+        if api_version == 2:
             self._cache_schemas(options)
 
         subcommand_parser = self.get_subcommand_parser(api_version)
@@ -573,6 +617,9 @@ class OpenStackImagesShell(object):
         # Short-circuit and deal with help command right away.
         if args.func == self.do_help:
             self.do_help(args)
+            return 0
+        elif args.func == self.do_bash_completion:
+            self.do_bash_completion(args)
             return 0
 
         LOG = logging.getLogger('glanceclient')
@@ -617,6 +664,22 @@ class OpenStackImagesShell(object):
                                        args.command)
         else:
             self.parser.print_help()
+
+    def do_bash_completion(self, _args):
+        """
+        Prints all of the commands and options to stdout so that the
+        glance.bash_completion script doesn't have to hard code them.
+        """
+        commands = set()
+        options = set()
+        for sc_str, sc in self.subcommands.items():
+            commands.add(sc_str)
+            for option in sc._optionals._option_string_actions.keys():
+                options.add(option)
+
+        commands.remove('bash_completion')
+        commands.remove('bash-completion')
+        print(' '.join(commands | options))
 
 
 class HelpFormatter(argparse.HelpFormatter):
