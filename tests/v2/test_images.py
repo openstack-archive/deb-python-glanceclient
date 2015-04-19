@@ -15,7 +15,6 @@
 
 import errno
 
-import six
 import testtools
 
 from glanceclient import exc
@@ -59,7 +58,7 @@ data_fixtures = {
                     },
                     'color': {'type': 'string', 'is_base': False},
                 },
-                'additionalProperties': {'type': 'string'}
+                'additionalProperties': {'type': 'string'},
             },
         ),
     },
@@ -76,6 +75,25 @@ data_fixtures = {
                     'name': 'image-2',
                 },
             ]},
+        ),
+    },
+    '/v2/images?limit=2': {
+        'GET': (
+            {},
+            {
+                'images': [
+                    {
+                        'id': '3a4560a1-e585-443e-9b39-553b46ec92d1',
+                        'name': 'image-1',
+                    },
+                    {
+                        'id': '6f99bf80-2ee6-47cf-acfe-1f1fabb7e810',
+                        'name': 'image-2',
+                    },
+                ],
+                'next': ('/v2/images?limit=2&'
+                         'marker=6f99bf80-2ee6-47cf-acfe-1f1fabb7e810'),
+            },
         ),
     },
     '/v2/images?limit=1': {
@@ -100,6 +118,17 @@ data_fixtures = {
                 {
                     'id': '6f99bf80-2ee6-47cf-acfe-1f1fabb7e810',
                     'name': 'image-2',
+                },
+            ]},
+        ),
+    },
+    ('/v2/images?limit=1&marker=6f99bf80-2ee6-47cf-acfe-1f1fabb7e810'): {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': '3f99bf80-2ee6-47cf-acfe-1f1fabb7e811',
+                    'name': 'image-3',
                 },
             ]},
         ),
@@ -365,8 +394,102 @@ data_fixtures = {
             {'images': []},
         ),
     },
+    '/v2/images?limit=%d&sort_key=name' % images.DEFAULT_PAGE_SIZE: {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': '2a4560b2-e585-443e-9b39-553b46ec92d1',
+                    'name': 'image-1',
+                },
+                {
+                    'id': '6f99bf80-2ee6-47cf-acfe-1f1fabb7e810',
+                    'name': 'image-2',
+                },
+            ]},
+        ),
+    },
+    '/v2/images?limit=%d&sort_key=name&sort_key=id'
+    % images.DEFAULT_PAGE_SIZE: {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': '2a4560b2-e585-443e-9b39-553b46ec92d1',
+                    'name': 'image',
+                },
+                {
+                    'id': '6f99bf80-2ee6-47cf-acfe-1f1fabb7e810',
+                    'name': 'image',
+                },
+            ]},
+        ),
+    },
+    '/v2/images?limit=%d&sort_dir=desc&sort_key=id'
+    % images.DEFAULT_PAGE_SIZE: {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': '6f99bf80-2ee6-47cf-acfe-1f1fabb7e810',
+                    'name': 'image-2',
+                },
+                {
+                    'id': '2a4560b2-e585-443e-9b39-553b46ec92d1',
+                    'name': 'image-1',
+                },
+            ]},
+        ),
+    },
+    '/v2/images?limit=%d&sort_dir=desc&sort_key=name&sort_key=id'
+    % images.DEFAULT_PAGE_SIZE: {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': '6f99bf80-2ee6-47cf-acfe-1f1fabb7e810',
+                    'name': 'image-2',
+                },
+                {
+                    'id': '2a4560b2-e585-443e-9b39-553b46ec92d1',
+                    'name': 'image-1',
+                },
+            ]},
+        ),
+    },
+    '/v2/images?limit=%d&sort_dir=desc&sort_dir=asc&sort_key=name&sort_key=id'
+    % images.DEFAULT_PAGE_SIZE: {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': '6f99bf80-2ee6-47cf-acfe-1f1fabb7e810',
+                    'name': 'image-2',
+                },
+                {
+                    'id': '2a4560b2-e585-443e-9b39-553b46ec92d1',
+                    'name': 'image-1',
+                },
+            ]},
+        ),
+    },
+    '/v2/images?limit=%d&sort=name%%3Adesc%%2Csize%%3Aasc'
+    % images.DEFAULT_PAGE_SIZE: {
+        'GET': (
+            {},
+            {'images': [
+                {
+                    'id': '6f99bf80-2ee6-47cf-acfe-1f1fabb7e810',
+                    'name': 'image-2',
+                },
+                {
+                    'id': '2a4560b2-e585-443e-9b39-553b46ec92d1',
+                    'name': 'image-1',
+                },
+            ]},
+        ),
+    },
 }
-
 
 schema_fixtures = {
     'image': {
@@ -389,8 +512,9 @@ schema_fixtures = {
                         }
                     },
                     'color': {'type': 'string', 'is_base': False},
+                    'tags': {'type': 'array'},
                 },
-                'additionalProperties': {'type': 'string'}
+                'additionalProperties': {'type': 'string'},
             }
         )
     }
@@ -419,6 +543,17 @@ class TestController(testtools.TestCase):
         self.assertEqual('image-1', images[0].name)
         self.assertEqual('6f99bf80-2ee6-47cf-acfe-1f1fabb7e810', images[1].id)
         self.assertEqual('image-2', images[1].name)
+
+    def test_list_images_paginated_with_limit(self):
+        # NOTE(bcwaldon):cast to list since the controller returns a generator
+        images = list(self.controller.list(limit=3, page_size=2))
+        self.assertEqual('3a4560a1-e585-443e-9b39-553b46ec92d1', images[0].id)
+        self.assertEqual('image-1', images[0].name)
+        self.assertEqual('6f99bf80-2ee6-47cf-acfe-1f1fabb7e810', images[1].id)
+        self.assertEqual('image-2', images[1].name)
+        self.assertEqual('3f99bf80-2ee6-47cf-acfe-1f1fabb7e811', images[2].id)
+        self.assertEqual('image-3', images[2].name)
+        self.assertEqual(3, len(images))
 
     def test_list_images_visibility_public(self):
         filters = {'filters': {'visibility': 'public'}}
@@ -488,10 +623,7 @@ class TestController(testtools.TestCase):
             #   /v2/images?owner=ni%C3%B1o&limit=20
             # We just want to make sure filters are correctly encoded.
             pass
-        if six.PY2:
-            self.assertEqual("ni\xc3\xb1o", filters["owner"])
-        else:
-            self.assertEqual("ni\xf1o", filters["owner"])
+        self.assertEqual(b"ni\xc3\xb1o", filters["owner"])
 
     def test_list_images_for_tag_single_image(self):
         img_id = '3a4560a1-e585-443e-9b39-553b46ec92d1'
@@ -521,6 +653,88 @@ class TestController(testtools.TestCase):
         filters = {'filters': {'tag': ['fake']}}
         images = list(self.controller.list(**filters))
         self.assertEqual(0, len(images))
+
+    def test_list_images_with_single_sort_key(self):
+        img_id1 = '2a4560b2-e585-443e-9b39-553b46ec92d1'
+        sort_key = 'name'
+        images = list(self.controller.list(sort_key=sort_key))
+        self.assertEqual(2, len(images))
+        self.assertEqual('%s' % img_id1, images[0].id)
+
+    def test_list_with_multiple_sort_keys(self):
+        img_id1 = '2a4560b2-e585-443e-9b39-553b46ec92d1'
+        sort_key = ['name', 'id']
+        images = list(self.controller.list(sort_key=sort_key))
+        self.assertEqual(2, len(images))
+        self.assertEqual('%s' % img_id1, images[0].id)
+
+    def test_list_images_with_desc_sort_dir(self):
+        img_id1 = '2a4560b2-e585-443e-9b39-553b46ec92d1'
+        sort_key = 'id'
+        sort_dir = 'desc'
+        images = list(self.controller.list(sort_key=sort_key,
+                                           sort_dir=sort_dir))
+        self.assertEqual(2, len(images))
+        self.assertEqual('%s' % img_id1, images[1].id)
+
+    def test_list_images_with_multiple_sort_keys_and_one_sort_dir(self):
+        img_id1 = '2a4560b2-e585-443e-9b39-553b46ec92d1'
+        sort_key = ['name', 'id']
+        sort_dir = 'desc'
+        images = list(self.controller.list(sort_key=sort_key,
+                                           sort_dir=sort_dir))
+        self.assertEqual(2, len(images))
+        self.assertEqual('%s' % img_id1, images[1].id)
+
+    def test_list_images_with_multiple_sort_dirs(self):
+        img_id1 = '2a4560b2-e585-443e-9b39-553b46ec92d1'
+        sort_key = ['name', 'id']
+        sort_dir = ['desc', 'asc']
+        images = list(self.controller.list(sort_key=sort_key,
+                                           sort_dir=sort_dir))
+        self.assertEqual(2, len(images))
+        self.assertEqual('%s' % img_id1, images[1].id)
+
+    def test_list_images_with_new_sorting_syntax(self):
+        img_id1 = '2a4560b2-e585-443e-9b39-553b46ec92d1'
+        sort = 'name:desc,size:asc'
+        images = list(self.controller.list(sort=sort))
+        self.assertEqual(2, len(images))
+        self.assertEqual('%s' % img_id1, images[1].id)
+
+    def test_list_images_sort_dirs_fewer_than_keys(self):
+        sort_key = ['name', 'id', 'created_at']
+        sort_dir = ['desc', 'asc']
+        self.assertRaises(exc.HTTPBadRequest,
+                          list,
+                          self.controller.list(
+                              sort_key=sort_key,
+                              sort_dir=sort_dir))
+
+    def test_list_images_combined_syntax(self):
+        sort_key = ['name', 'id']
+        sort_dir = ['desc', 'asc']
+        sort = 'name:asc'
+        self.assertRaises(exc.HTTPBadRequest,
+                          list,
+                          self.controller.list(
+                              sort=sort,
+                              sort_key=sort_key,
+                              sort_dir=sort_dir))
+
+    def test_list_images_new_sorting_syntax_invalid_key(self):
+        sort = 'INVALID:asc'
+        self.assertRaises(exc.HTTPBadRequest,
+                          list,
+                          self.controller.list(
+                              sort=sort))
+
+    def test_list_images_new_sorting_syntax_invalid_direction(self):
+        sort = 'name:INVALID'
+        self.assertRaises(exc.HTTPBadRequest,
+                          list,
+                          self.controller.list(
+                              sort=sort))
 
     def test_list_images_for_property(self):
         filters = {'filters': dict([('os_distro', 'NixOS')])}
@@ -851,6 +1065,22 @@ class TestController(testtools.TestCase):
             self._patch_req(image_id, mod_patch),
             self._empty_get(image_id)
         ])
+
+    def test_update_tags(self):
+        image_id = 'a2b83adc-888e-11e3-8872-78acc0b951d8'
+        tag_map = {'tags': ['tag01', 'tag02', 'tag03']}
+
+        image = self.controller.update(image_id, **tag_map)
+
+        expected_body = [{'path': '/tags', 'op': 'replace',
+                          'value': tag_map['tags']}]
+        expected = [
+            self._empty_get(image_id),
+            self._patch_req(image_id, expected_body),
+            self._empty_get(image_id)
+        ]
+        self.assertEqual(expected, self.api.calls)
+        self.assertEqual(image_id, image.id)
 
     def test_update_missing_location(self):
         image_id = 'a2b83adc-888e-11e3-8872-78acc0b951d8'

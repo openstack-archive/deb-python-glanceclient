@@ -24,6 +24,7 @@ import sys
 import threading
 import uuid
 
+from oslo_utils import importutils
 import six
 
 if os.name == 'nt':
@@ -31,11 +32,11 @@ if os.name == 'nt':
 else:
     msvcrt = None
 
+from oslo_utils import encodeutils
+from oslo_utils import strutils
 import prettytable
 
 from glanceclient import exc
-from glanceclient.openstack.common import importutils
-from glanceclient.openstack.common import strutils
 
 _memoized_property_lock = threading.Lock()
 
@@ -150,7 +151,7 @@ def print_list(objs, fields, formatters=None, field_settings=None):
                 row.append(data)
         pt.add_row(row)
 
-    print(strutils.safe_encode(pt.get_string()))
+    print(encodeutils.safe_decode(pt.get_string()))
 
 
 def print_dict(d, max_column_width=80):
@@ -161,7 +162,7 @@ def print_dict(d, max_column_width=80):
         if isinstance(v, (dict, list)):
             v = json.dumps(v)
         pt.add_row([k, v])
-    print(strutils.safe_encode(pt.get_string(sortby='Property')))
+    print(encodeutils.safe_decode(pt.get_string(sortby='Property')))
 
 
 def find_resource(manager, name_or_id):
@@ -175,7 +176,9 @@ def find_resource(manager, name_or_id):
 
     # now try to get entity as uuid
     try:
-        uuid.UUID(strutils.safe_encode(name_or_id))
+        # This must be unicode for Python 3 compatibility.
+        # If you pass a bytestring to uuid.UUID, you will get a TypeError
+        uuid.UUID(encodeutils.safe_decode(name_or_id))
         return manager.get(name_or_id)
     except (ValueError, exc.NotFound):
         pass
@@ -231,10 +234,10 @@ def import_versioned_module(version, submodule=None):
     return importutils.import_module(module)
 
 
-def exit(msg=''):
+def exit(msg='', exit_code=1):
     if msg:
-        print(strutils.safe_encode(msg), file=sys.stderr)
-    sys.exit(1)
+        print(encodeutils.safe_decode(msg), file=sys.stderr)
+    sys.exit(exit_code)
 
 
 def save_image(data, path):
@@ -291,7 +294,7 @@ def exception_to_str(exc):
         except UnicodeError:
             error = ("Caught '%(exception)s' exception." %
                      {"exception": exc.__class__.__name__})
-    return strutils.safe_encode(error, errors='ignore')
+    return encodeutils.safe_decode(error, errors='ignore')
 
 
 def get_file_size(file_obj):
@@ -421,3 +424,18 @@ def safe_header(name, value):
         return name, "{SHA1}%s" % d
     else:
         return name, value
+
+
+class IterableWithLength(object):
+    def __init__(self, iterable, length):
+        self.iterable = iterable
+        self.length = length
+
+    def __iter__(self):
+        return self.iterable
+
+    def next(self):
+        return next(self.iterable)
+
+    def __len__(self):
+        return self.length

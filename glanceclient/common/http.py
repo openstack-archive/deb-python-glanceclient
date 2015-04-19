@@ -17,7 +17,8 @@ import copy
 import logging
 import socket
 
-from oslo.utils import netutils
+from oslo_utils import importutils
+from oslo_utils import netutils
 import requests
 try:
     from requests.packages.urllib3.exceptions import ProtocolError
@@ -36,11 +37,11 @@ if not hasattr(parse, 'parse_qsl'):
     import cgi
     parse.parse_qsl = cgi.parse_qsl
 
+from oslo_utils import encodeutils
+
 from glanceclient.common import https
 from glanceclient.common.utils import safe_header
 from glanceclient import exc
-from glanceclient.openstack.common import importutils
-from glanceclient.openstack.common import strutils
 
 osprofiler_web = importutils.try_import("osprofiler.web")
 
@@ -94,7 +95,7 @@ class HTTPClient(object):
         return netutils.urlsplit(endpoint)
 
     def log_curl_request(self, method, url, headers, data, kwargs):
-        curl = ['curl -i -X %s' % method]
+        curl = ['curl -g -i -X %s' % method]
 
         headers = copy.deepcopy(headers)
         headers.update(self.session.headers)
@@ -117,7 +118,7 @@ class HTTPClient(object):
 
         curl.append(url)
 
-        msg = ' '.join([strutils.safe_encode(item, errors='ignore')
+        msg = ' '.join([encodeutils.safe_decode(item, errors='ignore')
                         for item in curl])
         LOG.debug(msg)
 
@@ -129,9 +130,9 @@ class HTTPClient(object):
         dump.extend(['%s: %s' % safe_header(k, v) for k, v in headers])
         dump.append('')
         if body:
-            body = strutils.safe_decode(body)
+            body = encodeutils.safe_decode(body)
             dump.extend([body, ''])
-        LOG.debug('\n'.join([strutils.safe_encode(x, errors='ignore')
+        LOG.debug('\n'.join([encodeutils.safe_decode(x, errors='ignore')
                              for x in dump]))
 
     @staticmethod
@@ -145,8 +146,8 @@ class HTTPClient(object):
         :returns: Dictionary with encoded headers'
                   names and values
         """
-        return dict((strutils.safe_encode(h), strutils.safe_encode(v))
-                    for h, v in six.iteritems(headers))
+        return dict((encodeutils.safe_encode(h), encodeutils.safe_encode(v))
+                    for h, v in six.iteritems(headers) if v is not None)
 
     def _request(self, method, url, **kwargs):
         """Send an http request with the specified characteristics.
@@ -168,6 +169,8 @@ class HTTPClient(object):
             chunk = body
             while chunk:
                 chunk = body.read(CHUNKSIZE)
+                if chunk == '':
+                    break
                 yield chunk
 
         data = kwargs.pop("data", None)
@@ -224,7 +227,7 @@ class HTTPClient(object):
 
         if not resp.ok:
             LOG.debug("Request returned failure status %s." % resp.status_code)
-            raise exc.from_response(resp, resp.content)
+            raise exc.from_response(resp, resp.text)
         elif resp.status_code == requests.codes.MULTIPLE_CHOICES:
             raise exc.from_response(resp)
 
@@ -234,10 +237,10 @@ class HTTPClient(object):
         if content_type == 'application/octet-stream':
             # Do not read all response in memory when
             # downloading an image.
-            body_iter = resp.iter_content(chunk_size=CHUNKSIZE)
+            body_iter = _close_after_stream(resp, CHUNKSIZE)
             self.log_http_response(resp)
         else:
-            content = resp.content
+            content = resp.text
             self.log_http_response(resp, content)
             if content_type and content_type.startswith('application/json'):
                 # Let's use requests json method,
@@ -269,3 +272,14 @@ class HTTPClient(object):
 
     def delete(self, url, **kwargs):
         return self._request('DELETE', url, **kwargs)
+
+
+def _close_after_stream(response, chunk_size):
+    """Iterate over the content and ensure the response is closed after."""
+    # Yield each chunk in the response body
+    for chunk in response.iter_content(chunk_size=chunk_size):
+        yield chunk
+    # Once we're done streaming the body, ensure everything is closed.
+    # This will return the connection to the HTTPConnectionPool in urllib3
+    # and ideally reduce the number of HTTPConnectionPool full warnings.
+    response.close()

@@ -16,18 +16,24 @@
 from __future__ import print_function
 
 import copy
+import functools
+import os
 import six
 import sys
+
+from oslo_utils import encodeutils
+from oslo_utils import strutils
 
 from glanceclient.common import progressbar
 from glanceclient.common import utils
 from glanceclient import exc
-from glanceclient.openstack.common import strutils
 import glanceclient.v1.images
 
 CONTAINER_FORMATS = 'Acceptable formats: ami, ari, aki, bare, and ovf.'
 DISK_FORMATS = ('Acceptable formats: ami, ari, aki, vhd, vmdk, raw, '
                 'qcow2, vdi, and iso.')
+
+_bool_strict = functools.partial(strutils.bool_from_string, strict=True)
 
 
 @utils.arg('--name', metavar='<NAME>',
@@ -58,7 +64,7 @@ DISK_FORMATS = ('Acceptable formats: ami, ari, aki, vhd, vmdk, raw, '
            choices=glanceclient.v1.images.SORT_DIR_VALUES,
            help='Sort image list in specified direction.')
 @utils.arg('--is-public',
-           type=strutils.bool_from_string, metavar='{True,False}',
+           type=_bool_strict, metavar='{True,False}',
            help=('Allows the user to select a listing of public or non '
                  'public images.'))
 @utils.arg('--owner', default=None, metavar='<TENANT_ID>',
@@ -80,6 +86,10 @@ def do_image_list(gc, args):
 
     if args.properties:
         property_filter_items = [p.split('=', 1) for p in args.properties]
+        if any(len(pair) != 2 for pair in property_filter_items):
+            utils.exit('Argument --property-filter requires properties in the'
+                       ' format KEY=VALUE')
+
         filters['properties'] = dict(property_filter_items)
 
     kwargs = {'filters': filters}
@@ -188,10 +198,10 @@ def do_image_download(gc, args):
                  ' the Glance server should immediately copy the data and'
                  ' store it in its configured image store.'))
 @utils.arg('--is-public',
-           type=strutils.bool_from_string, metavar='{True,False}',
+           type=_bool_strict, metavar='{True,False}',
            help='Make image accessible to the public.')
 @utils.arg('--is-protected',
-           type=strutils.bool_from_string, metavar='{True,False}',
+           type=_bool_strict, metavar='{True,False}',
            help='Prevent image from being deleted.')
 @utils.arg('--property', metavar="<key=value>", action='append', default=[],
            help=("Arbitrary property to associate with image. "
@@ -225,12 +235,26 @@ def do_image_create(gc, args):
     # Only show progress bar for local image files
     if fields.get('data') and args.progress:
         filesize = utils.get_file_size(fields['data'])
-        fields['data'] = progressbar.VerboseFileWrapper(
-            fields['data'], filesize
-        )
+        if filesize is not None:
+            # NOTE(kragniz): do not show a progress bar if the size of the
+            # input is unknown (most likely a piped input)
+            fields['data'] = progressbar.VerboseFileWrapper(
+                fields['data'], filesize
+            )
 
     image = gc.images.create(**fields)
     _image_show(image, args.human_readable)
+
+
+def _is_image_data_provided(args):
+    """Return True if some image data has probably been provided by the user"""
+    # NOTE(kragniz): Check stdin works, then check is there is any data
+    # on stdin or a filename has been provided with --file
+    try:
+        os.fstat(0)
+    except OSError:
+        return False
+    return not sys.stdin.isatty() or args.file or args.copy_from
 
 
 @utils.arg('image', metavar='<IMAGE>', help='Name or ID of image to modify.')
@@ -265,10 +289,10 @@ def do_image_create(gc, args):
                  ' the Glance server should immediately copy the data and'
                  ' store it in its configured image store.'))
 @utils.arg('--is-public',
-           type=strutils.bool_from_string, metavar='{True,False}',
+           type=_bool_strict, metavar='{True,False}',
            help='Make image accessible to the public.')
 @utils.arg('--is-protected',
-           type=strutils.bool_from_string, metavar='{True,False}',
+           type=_bool_strict, metavar='{True,False}',
            help='Prevent image from being deleted.')
 @utils.arg('--property', metavar="<key=value>", action='append', default=[],
            help=("Arbitrary property to associate with image. "
@@ -311,6 +335,12 @@ def do_image_update(gc, args):
                 fields['data'], filesize
             )
 
+    elif _is_image_data_provided(args):
+        # NOTE(kragniz): Exit with an error if the status is not queued
+        # and image data was provided
+        utils.exit('Unable to upload image data to an image which '
+                   'is %s.' % image.status)
+
     image = gc.images.update(image, purge_props=args.purge_props, **fields)
     _image_show(image, args.human_readable)
 
@@ -321,10 +351,13 @@ def do_image_delete(gc, args):
     """Delete specified image(s)."""
     for args_image in args.images:
         image = utils.find_resource(gc.images, args_image)
+        if image and image.status == "deleted":
+            msg = "No image with an ID of '%s' exists." % image.id
+            raise exc.CommandError(msg)
         try:
             if args.verbose:
                 print('Requesting image delete for %s ...' %
-                      strutils.safe_encode(args_image), end=' ')
+                      encodeutils.safe_decode(args_image), end=' ')
 
             gc.images.delete(image)
 
@@ -344,15 +377,15 @@ def do_image_delete(gc, args):
 def do_member_list(gc, args):
     """Describe sharing permissions by image or tenant."""
     if args.image_id and args.tenant_id:
-        print('Unable to filter members by both --image-id and --tenant-id.')
-        sys.exit(1)
+        utils.exit('Unable to filter members by both --image-id and'
+                   ' --tenant-id.')
     elif args.image_id:
         kwargs = {'image': args.image_id}
     elif args.tenant_id:
         kwargs = {'member': args.tenant_id}
     else:
-        print('Unable to list all members. Specify --image-id or --tenant-id')
-        sys.exit(1)
+        utils.exit('Unable to list all members. Specify --image-id or'
+                   ' --tenant-id')
 
     members = gc.image_members.list(**kwargs)
     columns = ['Image ID', 'Member ID', 'Can Share']

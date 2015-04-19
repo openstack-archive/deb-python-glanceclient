@@ -10,11 +10,13 @@ In order to use the python api directly, you must first obtain an auth token and
     >>> image.update(data=open('/tmp/myimage.iso', 'rb'))
     >>> print image.status
     'active'
+    >>> image.update(properties=dict(my_custom_property='value'))
     >>> with open('/tmp/copyimage.iso', 'wb') as f:
             for chunk in image.data:
                 f.write(chunk)
     >>> image.delete()
 
+For an API v2 example see also :doc:`apiv2`.
 
 Command-line Tool
 =================
@@ -36,6 +38,72 @@ See also :doc:`/man/glance`.
 
 Release Notes
 =============
+
+0.17.0
+------
+
+* 1420707_: Updated help for v2 member-update api
+* glance-sorting-enhancements_: Extend images CLI v2 with new sorting syntax
+* glance-sorting-enhancements_: Add the ability to specify the sort dir for each key
+* glance-sorting-enhancements_: Adds the ability to sort images with multiple keys
+* 1306774_: Apply expected patch format when updating tags in v2.images
+* 1429088_: v2: read limit for list from --limit in shell
+* 1428797_: Fix leaking sockets after v2 list operation
+* 1423939_: Fix leaking sockets after v1 list operation
+* 1408033_: v2: Allow upload from stdin on image-create
+
+.. _1420707: https://bugs.launchpad.net/python-glanceclient/+bug/1420707
+.. _glance-sorting-enhancements: https://blueprints.launchpad.net/glance/+spec/glance-sorting-enhancements
+.. _1306774: https://bugs.launchpad.net/python-glanceclient/+bug/1306774
+.. _1429088: https://bugs.launchpad.net/python-glanceclient/+bug/1429088
+.. _1428797: https://bugs.launchpad.net/python-glanceclient/+bug/1428797
+.. _1423939: https://bugs.launchpad.net/python-glanceclient/+bug/1423939
+.. _1408033: https://bugs.launchpad.net/python-glanceclient/+bug/1408033
+
+0.16.1
+------
+
+* 1423165_: Fix sockets leaking for a subset of operations (show, delete and update)
+* 1395084_: Show error when trying to upload image data to non-queued image
+* 1398838_: Stop showing JSON and HTML in error messages returned from the glance service
+* 1396550_: More reliably register connection pools in cases where urllib3 is both vendored and installed system-wide
+
+.. _1423165: https://bugs.launchpad.net/python-glanceclient/+bug/1423165
+.. _1395084: https://bugs.launchpad.net/python-glanceclient/+bug/1395084
+.. _1398838: https://bugs.launchpad.net/python-glanceclient/+bug/1398838
+.. _1396550: https://bugs.launchpad.net/python-glanceclient/+bug/1396550
+
+0.16.0
+------
+
+* Add --limit option to the v2 list operation. This allows a user to limit the
+  number of images requested from the glance server. Previously the client
+  would always go through the entire list of images
+* The CLI exit code on keyboard interrupt is now ``130``, changed from ``1``.
+
+* 1370283_: The set of supported SSL ciphers is now reduced to a smaller and more secure subset
+* 1384664_, 1402746_: Fix enabling the progress bar on download and upload when
+  image data is piped into the client causing the client to crash
+* 1415935_: NoneType header values are now ignored when encoding headers
+* 1341777_: Requests which are streamed are now explicitly closed when the end
+  of the stream has been reached
+* 1394236_: The CLI is now strict about what it counts as a boolean, and exits
+  with an error if a non-boolean value is used as input to a boolean option
+* 1401197_: The CLI is now strict about valid inputs to ``--os-image-api-version``
+* 1333119_: The CLI now raises a more useful error message when a user requests the deletion of an image which is already deleted
+* 1384759_: Fix client erroring if ``--os-tenant-id`` and ``--os-tenant-name``
+  are not defined
+* 1228744_: Add globoff option to debug curl statements. This allows it to work with IPv6 addresses
+
+.. _1370283: https://bugs.launchpad.net/python-glanceclient/+bug/1370283
+.. _1384664: https://bugs.launchpad.net/python-glanceclient/+bug/1384664
+.. _1402746: https://bugs.launchpad.net/python-glanceclient/+bug/1402746
+.. _1415935: https://bugs.launchpad.net/python-glanceclient/+bug/1415935
+.. _1394236: https://bugs.launchpad.net/python-glanceclient/+bug/1394236
+.. _1401197: https://bugs.launchpad.net/python-glanceclient/+bug/1401197
+.. _1384759: https://bugs.launchpad.net/python-glanceclient/+bug/1384759
+.. _1228744: https://bugs.launchpad.net/python-glanceclient/+bug/1228744
+.. _1333119: https://bugs.launchpad.net/python-glanceclient/+bug/1333119
 
 0.15.0
 ------

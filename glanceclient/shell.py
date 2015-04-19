@@ -29,14 +29,14 @@ from os.path import expanduser
 import sys
 import traceback
 
+from oslo_utils import encodeutils
+from oslo_utils import importutils
 import six.moves.urllib.parse as urlparse
 
 import glanceclient
+from glanceclient import _i18n
 from glanceclient.common import utils
 from glanceclient import exc
-from glanceclient.openstack.common.gettextutils import _
-from glanceclient.openstack.common import importutils
-from glanceclient.openstack.common import strutils
 
 from keystoneclient.auth.identity import v2 as v2_auth
 from keystoneclient.auth.identity import v3 as v3_auth
@@ -45,6 +45,7 @@ from keystoneclient.openstack.common.apiclient import exceptions as ks_exc
 from keystoneclient import session
 
 osprofiler_profiler = importutils.try_import("osprofiler.profiler")
+_ = _i18n._
 
 
 class OpenStackImagesShell(object):
@@ -249,7 +250,7 @@ class OpenStackImagesShell(object):
         parser.add_argument('--os-image-url',
                             default=utils.env('OS_IMAGE_URL'),
                             help=('Defaults to env[OS_IMAGE_URL]. '
-                                  'If the provided image url contains a '
+                                  'If the provided image url contains '
                                   'a version number and '
                                   '`--os-image-api-version` is omitted '
                                   'the version of the URL will be picked as '
@@ -477,15 +478,17 @@ class OpenStackImagesShell(object):
                           "or prompted response"))
 
             # Validate password flow auth
-            project_info = (args.os_tenant_name or
-                            args.os_tenant_id or
-                            (args.os_project_name and
-                            (args.project_domain_name or
-                                args.project_domain_id)) or
-                            args.os_project_id)
+            project_info = (
+                args.os_tenant_name or args.os_tenant_id or (
+                    args.os_project_name and (
+                        args.os_project_domain_name or
+                        args.os_project_domain_id
+                    )
+                ) or args.os_project_id
+            )
 
-            if (not project_info):
-                # tenent is deprecated in Keystone v3. Use the latest
+            if not project_info:
+                # tenant is deprecated in Keystone v3. Use the latest
                 # terminology instead.
                 raise exc.CommandError(
                     _("You must provide a project_id or project_name ("
@@ -571,14 +574,14 @@ class OpenStackImagesShell(object):
                     with open(schema_file_path, 'w') as f:
                         f.write(json.dumps(schema.raw()))
                 except Exception:
-                    #NOTE(esheffield) do nothing here, we'll get a message
-                    #later if the schema is missing
+                    # NOTE(esheffield) do nothing here, we'll get a message
+                    # later if the schema is missing
                     pass
 
     def main(self, argv):
         # Parse args once to find version
 
-        #NOTE(flepied) Under Python3, parsed arguments are removed
+        # NOTE(flepied) Under Python3, parsed arguments are removed
         # from the list so make a copy for the first parsing
         base_argv = copy.deepcopy(argv)
         parser = self.get_base_parser()
@@ -597,7 +600,11 @@ class OpenStackImagesShell(object):
             url_version = None
 
         # build available subcommands based on version
-        api_version = int(options.os_image_api_version or url_version or 1)
+        try:
+            api_version = int(options.os_image_api_version or url_version or 1)
+        except ValueError:
+            print("Invalid API version parameter")
+            utils.exit()
 
         if api_version == 2:
             self._cache_schemas(options)
@@ -638,8 +645,8 @@ class OpenStackImagesShell(object):
         except exc.Unauthorized:
             raise exc.CommandError("Invalid OpenStack Identity credentials.")
         except Exception:
-            #NOTE(kragniz) Print any exceptions raised to stderr if the --debug
-            # flag is set
+            # NOTE(kragniz) Print any exceptions raised to stderr if the
+            # --debug flag is set
             if args.debug:
                 traceback.print_exc()
             raise
@@ -666,7 +673,8 @@ class OpenStackImagesShell(object):
             self.parser.print_help()
 
     def do_bash_completion(self, _args):
-        """
+        """Prints arguments for bash_completion.
+
         Prints all of the commands and options to stdout so that the
         glance.bash_completion script doesn't have to hard code them.
         """
@@ -691,10 +699,8 @@ class HelpFormatter(argparse.HelpFormatter):
 
 def main():
     try:
-        OpenStackImagesShell().main(map(strutils.safe_decode, sys.argv[1:]))
+        OpenStackImagesShell().main(map(encodeutils.safe_decode, sys.argv[1:]))
     except KeyboardInterrupt:
-        print('... terminating glance client', file=sys.stderr)
-        sys.exit(1)
+        utils.exit('... terminating glance client', exit_code=130)
     except Exception as e:
-        print(utils.exception_to_str(e), file=sys.stderr)
-        sys.exit(1)
+        utils.exit(utils.exception_to_str(e))

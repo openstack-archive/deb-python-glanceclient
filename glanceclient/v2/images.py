@@ -14,16 +14,21 @@
 #    under the License.
 
 import json
+
+from oslo_utils import encodeutils
 import six
 from six.moves.urllib import parse
 import warlock
 
 from glanceclient.common import utils
 from glanceclient import exc
-from glanceclient.openstack.common import strutils
 from glanceclient.v2 import schemas
 
 DEFAULT_PAGE_SIZE = 20
+
+SORT_DIR_VALUES = ('asc', 'desc')
+SORT_KEY_VALUES = ('name', 'status', 'container_format', 'disk_format',
+                   'size', 'id', 'created_at', 'updated_at')
 
 
 class Controller(object):
@@ -36,6 +41,35 @@ class Controller(object):
         schema = self.schema_client.get('image')
         return warlock.model_factory(schema.raw(), schemas.SchemaBasedModel)
 
+    @staticmethod
+    def _wrap(value):
+        if isinstance(value, six.string_types):
+            return [value]
+        return value
+
+    @staticmethod
+    def _validate_sort_param(sort):
+        """Validates sorting argument for invalid keys and directions values.
+
+        :param sort: comma-separated list of sort keys with optional <:dir>
+        after each key
+        """
+        for sort_param in sort.strip().split(','):
+            key, _sep, dir = sort_param.partition(':')
+            if dir and dir not in SORT_DIR_VALUES:
+                msg = ('Invalid sort direction: %(sort_dir)s.'
+                       ' It must be one of the following: %(available)s.'
+                       ) % {'sort_dir': dir,
+                            'available': ', '.join(SORT_DIR_VALUES)}
+                raise exc.HTTPBadRequest(msg)
+            if key not in SORT_KEY_VALUES:
+                msg = ('Invalid sort key: %(sort_key)s.'
+                       ' It must be one of the following: %(available)s.'
+                       ) % {'sort_key': key,
+                            'available': ', '.join(SORT_KEY_VALUES)}
+                raise exc.HTTPBadRequest(msg)
+        return sort
+
     def list(self, **kwargs):
         """Retrieve a listing of Image objects
 
@@ -46,55 +80,92 @@ class Controller(object):
         ori_validate_fun = self.model.validate
         empty_fun = lambda *args, **kwargs: None
 
-        def paginate(url):
-            resp, body = self.http_client.get(url)
-            for image in body['images']:
-                # NOTE(bcwaldon): remove 'self' for now until we have
-                # an elegant way to pass it into the model constructor
-                # without conflict.
-                image.pop('self', None)
-                yield self.model(**image)
-                # NOTE(zhiyan): In order to resolve the performance issue
-                # of JSON schema validation for image listing case, we
-                # don't validate each image entry but do it only on first
-                # image entry for each page.
-                self.model.validate = empty_fun
+        limit = kwargs.get('limit')
+        # NOTE(flaper87): Don't use `get('page_size', DEFAULT_SIZE)` otherwise,
+        # it could be possible to send invalid data to the server by passing
+        # page_size=None.
+        page_size = kwargs.get('page_size') or DEFAULT_PAGE_SIZE
 
-            # NOTE(zhiyan); Reset validation function.
-            self.model.validate = ori_validate_fun
+        def paginate(url, page_size, limit=None):
+            next_url = url
 
-            try:
-                next_url = body['next']
-            except KeyError:
-                return
-            else:
-                for image in paginate(next_url):
-                    yield image
+            while True:
+                if limit and page_size > limit:
+                    # NOTE(flaper87): Avoid requesting 2000 images when limit
+                    # is 1
+                    next_url = next_url.replace("limit=%s" % page_size,
+                                                "limit=%s" % limit)
+
+                resp, body = self.http_client.get(next_url)
+                for image in body['images']:
+                    # NOTE(bcwaldon): remove 'self' for now until we have
+                    # an elegant way to pass it into the model constructor
+                    # without conflict.
+                    image.pop('self', None)
+                    yield self.model(**image)
+                    # NOTE(zhiyan): In order to resolve the performance issue
+                    # of JSON schema validation for image listing case, we
+                    # don't validate each image entry but do it only on first
+                    # image entry for each page.
+                    self.model.validate = empty_fun
+
+                    if limit:
+                        limit -= 1
+                        if limit <= 0:
+                            raise StopIteration
+
+                # NOTE(zhiyan); Reset validation function.
+                self.model.validate = ori_validate_fun
+
+                try:
+                    next_url = body['next']
+                except KeyError:
+                    return
 
         filters = kwargs.get('filters', {})
-
-        if not kwargs.get('page_size'):
-            filters['limit'] = DEFAULT_PAGE_SIZE
-        else:
-            filters['limit'] = kwargs['page_size']
+        # NOTE(flaper87): We paginate in the client, hence we use
+        # the page_size as Glance's limit.
+        filters['limit'] = page_size
 
         tags = filters.pop('tag', [])
         tags_url_params = []
 
         for tag in tags:
             if isinstance(tag, six.string_types):
-                tags_url_params.append({'tag': strutils.safe_encode(tag)})
+                tags_url_params.append({'tag': encodeutils.safe_encode(tag)})
 
         for param, value in six.iteritems(filters):
             if isinstance(value, six.string_types):
-                filters[param] = strutils.safe_encode(value)
+                filters[param] = encodeutils.safe_encode(value)
 
         url = '/v2/images?%s' % parse.urlencode(filters)
 
         for param in tags_url_params:
             url = '%s&%s' % (url, parse.urlencode(param))
 
-        for image in paginate(url):
+        if 'sort' in kwargs:
+            if 'sort_key' in kwargs or 'sort_dir' in kwargs:
+                raise exc.HTTPBadRequest("The 'sort' argument is not supported"
+                                         " with 'sort_key' or 'sort_dir'.")
+            url = '%s&sort=%s' % (url,
+                                  self._validate_sort_param(
+                                      kwargs['sort']))
+        else:
+            sort_dir = self._wrap(kwargs.get('sort_dir', []))
+            sort_key = self._wrap(kwargs.get('sort_key', []))
+
+            if len(sort_key) != len(sort_dir) and len(sort_dir) > 1:
+                raise exc.HTTPBadRequest(
+                    "Unexpected number of sort directions: "
+                    "either provide a single sort direction or an equal "
+                    "number of sort keys and sort directions.")
+            for key in sort_key:
+                url = '%s&sort_key=%s' % (url, key)
+
+            for dir in sort_dir:
+                url = '%s&sort_dir=%s' % (url, dir)
+
+        for image in paginate(url, page_size, limit):
             yield image
 
     def get(self, image_id):
@@ -115,10 +186,12 @@ class Controller(object):
         url = '/v2/images/%s/file' % image_id
         resp, body = self.http_client.get(url)
         checksum = resp.headers.get('content-md5', None)
+        content_length = int(resp.headers.get('content-length', 0))
+
         if do_checksum and checksum is not None:
-            return utils.integrity_iter(body, checksum)
-        else:
-            return body
+            body = utils.integrity_iter(body, checksum)
+
+        return utils.IterableWithLength(body, content_length)
 
     def upload(self, image_id, image_data, image_size=None):
         """

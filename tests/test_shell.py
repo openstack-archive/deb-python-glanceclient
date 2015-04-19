@@ -69,8 +69,8 @@ class ShellTest(utils.TestCase):
     auth_plugin = 'keystoneclient.auth.identity.v2.Password'
 
     # Patch os.environ to avoid required auth info
-    def make_env(self, exclude=None, fake_env=FAKE_V2_ENV):
-        env = dict((k, v) for k, v in fake_env.items() if k != exclude)
+    def make_env(self, exclude=None):
+        env = dict((k, v) for k, v in self.auth_env.items() if k != exclude)
         self.useFixture(fixtures.MonkeyPatch('os.environ', env))
 
     def setUp(self):
@@ -254,10 +254,12 @@ class ShellTest(utils.TestCase):
 
     @mock.patch('sys.stdin', side_effect=mock.MagicMock)
     @mock.patch('getpass.getpass', return_value='password')
-    def test_password_prompted_with_v2(self, mock_getpass, mock_stdin):
+    @mock.patch('keystoneclient.session.Session.get_token',
+                side_effect=ks_exc.ConnectionRefused)
+    def test_password_prompted_with_v2(self, mock_session, mock_getpass,
+                                       mock_stdin):
         glance_shell = openstack_shell.OpenStackImagesShell()
         self.make_env(exclude='OS_PASSWORD')
-        # We will get a Connection Refused because there is no keystone.
         self.assertRaises(ks_exc.ConnectionRefused,
                           glance_shell.main, ['image-list'])
         # Make sure we are actually prompted.
@@ -272,6 +274,79 @@ class ShellTest(utils.TestCase):
         self.assertRaises(exc.CommandError, glance_shell.main, ['image-list'])
         # Make sure we are actually prompted.
         mock_getpass.assert_called_with('OS Password: ')
+
+    @mock.patch(
+        'glanceclient.shell.OpenStackImagesShell._get_keystone_session')
+    @mock.patch.object(openstack_shell.OpenStackImagesShell, '_cache_schemas')
+    def test_no_auth_with_proj_name(self, cache_schemas, session):
+        with mock.patch('glanceclient.v2.client.Client'):
+            args = ('--os-project-name myname '
+                    '--os-project-domain-name mydomain '
+                    '--os-project-domain-id myid '
+                    '--os-image-api-version 2 image-list')
+            glance_shell = openstack_shell.OpenStackImagesShell()
+            glance_shell.main(args.split())
+            ((args), kwargs) = session.call_args
+            self.assertEqual('myname', kwargs['project_name'])
+            self.assertEqual('mydomain', kwargs['project_domain_name'])
+            self.assertEqual('myid', kwargs['project_domain_id'])
+
+    @mock.patch.object(openstack_shell.OpenStackImagesShell, 'main')
+    def test_shell_keyboard_interrupt(self, mock_glance_shell):
+        # Ensure that exit code is 130 for KeyboardInterrupt
+        try:
+            mock_glance_shell.side_effect = KeyboardInterrupt()
+            openstack_shell.main()
+        except SystemExit as ex:
+            self.assertEqual(130, ex.code)
+
+    @mock.patch('glanceclient.v1.client.Client')
+    def test_auth_plugin_invocation_without_username_with_v1(self, v1_client):
+        self.make_env(exclude='OS_USERNAME')
+        args = 'image-list'
+        glance_shell = openstack_shell.OpenStackImagesShell()
+        self.assertRaises(exc.CommandError, glance_shell.main, args.split())
+
+    @mock.patch('glanceclient.v2.client.Client')
+    def test_auth_plugin_invocation_without_username_with_v2(self, v2_client):
+        self.make_env(exclude='OS_USERNAME')
+        args = '--os-image-api-version 2 image-list'
+        glance_shell = openstack_shell.OpenStackImagesShell()
+        self.assertRaises(exc.CommandError, glance_shell.main, args.split())
+
+    @mock.patch('glanceclient.v1.client.Client')
+    def test_auth_plugin_invocation_without_auth_url_with_v1(self, v1_client):
+        self.make_env(exclude='OS_AUTH_URL')
+        args = 'image-list'
+        glance_shell = openstack_shell.OpenStackImagesShell()
+        self.assertRaises(exc.CommandError, glance_shell.main, args.split())
+
+    @mock.patch('glanceclient.v2.client.Client')
+    def test_auth_plugin_invocation_without_auth_url_with_v2(self, v2_client):
+        self.make_env(exclude='OS_AUTH_URL')
+        args = '--os-image-api-version 2 image-list'
+        glance_shell = openstack_shell.OpenStackImagesShell()
+        self.assertRaises(exc.CommandError, glance_shell.main, args.split())
+
+    @mock.patch('glanceclient.v1.client.Client')
+    def test_auth_plugin_invocation_without_tenant_with_v1(self, v1_client):
+        if 'OS_TENANT_NAME' in os.environ:
+            self.make_env(exclude='OS_TENANT_NAME')
+        if 'OS_PROJECT_ID' in os.environ:
+            self.make_env(exclude='OS_PROJECT_ID')
+        args = 'image-list'
+        glance_shell = openstack_shell.OpenStackImagesShell()
+        self.assertRaises(exc.CommandError, glance_shell.main, args.split())
+
+    @mock.patch('glanceclient.v2.client.Client')
+    def test_auth_plugin_invocation_without_tenant_with_v2(self, v2_client):
+        if 'OS_TENANT_NAME' in os.environ:
+            self.make_env(exclude='OS_TENANT_NAME')
+        if 'OS_PROJECT_ID' in os.environ:
+            self.make_env(exclude='OS_PROJECT_ID')
+        args = '--os-image-api-version 2 image-list'
+        glance_shell = openstack_shell.OpenStackImagesShell()
+        self.assertRaises(exc.CommandError, glance_shell.main, args.split())
 
 
 class ShellTestWithKeystoneV3Auth(ShellTest):
