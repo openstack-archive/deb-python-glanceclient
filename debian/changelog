@@ -1,6 +1,7 @@
-python-glanceclient (1:0.17.0-1) UNRELEASED; urgency=medium
+python-glanceclient (1:0.17.1-1) unstable; urgency=medium
 
   * New upstream release.
+  * Uploading to unstable.
   * Added python-oslo.utils (>= 1.0.0) as (build-)depends.
   * Removed disable-intersphinx.patch, refreshed urllib3 patch.
 
