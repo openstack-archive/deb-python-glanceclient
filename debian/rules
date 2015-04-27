@@ -23,15 +23,19 @@ override_dh_install:
 	rm -rf $(CURDIR)/debian/python-glanceclient/usr/glanceclient
 
 override_dh_auto_test:
-ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
-	set -e && \
-		TEMP_REZ=`mktemp -t` && \
-		python setup.py testr --slowest --testr-args='--subunit  ' | tee $$TEMP_REZ | subunit2pyunit || true ; \
+ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
+	@echo "===> Running tests"
+	set -e ; set -x ; for i in 2.7 ; do \
+		PYMAJOR=`echo $$i | cut -d'.' -f1` ; \
+		echo "===> Testing with python$$i (python$$PYMAJOR)" ; \
+		rm -rf .testrepository ; \
+		testr-python$$PYMAJOR init ; \
+		TEMP_REZ=`mktemp -t` ; \
+		PYTHONPATH=$(CURDIR) PYTHON=python$$i testr-python$$PYMAJOR run --subunit | tee $$TEMP_REZ | subunit2pyunit ; \
 		cat $$TEMP_REZ | subunit-filter -s --no-passthrough | subunit-stats ; \
-		rm -f $$TEMP_REZ
-	#python setup.py testr --testr-args='--subunit  '
-#	./run_tests.sh -N -P
-#	set -e ; for pyversion in $(shell pyversions -r); do $$pyversion setup.py test; done
+		rm -f $$TEMP_REZ ; \
+		testr-python$$PYMAJOR slowest ; \
+	done
 endif
 
 override_dh_installman:
