@@ -34,6 +34,7 @@ Standards-Version: 3.9.6
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-glanceclient.git;a=summary
 Vcs-Git: git://anonscm.debian.org/openstack/python-glanceclient.git
 Homepage: http://glance.openstack.org
+XS-Testsuite: autopkgtest
 
 Package: python-glanceclient
 Architecture: all
