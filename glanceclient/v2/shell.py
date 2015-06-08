@@ -39,7 +39,8 @@ def get_image_schema():
 
 @utils.schema_args(get_image_schema, omit=['created_at', 'updated_at', 'file',
                                            'checksum', 'virtual_size', 'size',
-                                           'status', 'schema', 'direct_url'])
+                                           'status', 'schema', 'direct_url',
+                                           'locations'])
 @utils.arg('--property', metavar="<key=value>", action='append',
            default=[], help=('Arbitrary property to associate with image.'
                              ' May be used multiple times.'))
@@ -142,7 +143,7 @@ def do_image_list(gc, args):
     filter_items = [(key, getattr(args, key)) for key in filter_keys]
     if args.properties:
         filter_properties = [prop.split('=', 1) for prop in args.properties]
-        if False in (len(pair) == 2 for pair in filter_properties):
+        if any(len(pair) != 2 for pair in filter_properties):
             utils.exit('Argument --property-filter expected properties in the'
                        ' format KEY=VALUE')
         filter_items += filter_properties
@@ -169,12 +170,14 @@ def do_image_list(gc, args):
 
 
 @utils.arg('id', metavar='<IMAGE_ID>', help='ID of image to describe.')
+@utils.arg('--human-readable', action='store_true', default=False,
+           help='Print image size in a human-friendly format.')
 @utils.arg('--max-column-width', metavar='<integer>', default=80,
            help='The max column width of the printed table.')
 def do_image_show(gc, args):
     """Describe a specific image."""
     image = gc.images.get(args.id)
-    utils.print_image(image, int(args.max_column_width))
+    utils.print_image(image, args.human_readable, int(args.max_column_width))
 
 
 @utils.arg('--image-id', metavar='<IMAGE_ID>', required=True,
