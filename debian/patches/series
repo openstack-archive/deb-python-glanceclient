@@ -1,2 +1,3 @@
 install-missing-files.patch
 do-not-crash-on-homedir-creation.patch
+fix-has-expired-tests.patch
