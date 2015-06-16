@@ -1,4 +1,4 @@
-python-glanceclient (1:0.18.0-1) UNRELEASED; urgency=medium
+python-glanceclient (1:0.18.0-1) experimental; urgency=medium
 
   * New upstream release.
     - d/control: Align requirements with upstream.
@@ -8,7 +8,7 @@ python-glanceclient (1:0.18.0-1) UNRELEASED; urgency=medium
   * Converge Ubuntu and Debian package:
     - d/tests/*: Add DEP 8 tests from Ubuntu.
 
- -- Corey Bryant <corey.bryant@canonical.com>  Mon, 08 Jun 2015 14:33:01 -0400
+ -- Corey Bryant <corey.bryant@canonical.com>  Tue, 16 Jun 2015 15:20:58 +0100
 
 python-glanceclient (1:0.17.1-1) unstable; urgency=medium
 
