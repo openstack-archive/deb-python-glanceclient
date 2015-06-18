@@ -2,7 +2,7 @@ Source: python-glanceclient
 Section: python
 Priority: extra
 Maintainer: PKG OpenStack <openstack-devel@lists.alioth.debian.org>
-Uploaders: Thomas Goirand <zigo@debian.org>
+Uploaders: Thomas Goirand <zigo@debian.org>,
 Build-Depends: debhelper (>= 9),
                dh-python,
                openstack-pkg-tools,
@@ -10,6 +10,9 @@ Build-Depends: debhelper (>= 9),
                python-pbr,
                python-setuptools,
                python-sphinx,
+               python3-all,
+               python3-pbr,
+               python3-setuptools,
 Build-Depends-Indep: python-babel,
                      python-coverage,
                      python-fixtures,
@@ -28,6 +31,22 @@ Build-Depends-Indep: python-babel,
                      python-testtools (>= 0.9.36),
                      python-unittest2,
                      python-warlock,
+                     python3-babel,
+                     python3-fixtures,
+                     python3-hacking,
+                     python3-keystoneclient (>= 1:1.1.0),
+                     python3-mock,
+                     python3-mox3,
+                     python3-openssl,
+                     python3-oslo.i18n (>= 1.5.0),
+                     python3-oslo.utils (>= 1.4.0),
+                     python3-prettytable,
+                     python3-requests,
+                     python3-requests-mock (>= 0.6.0),
+                     python3-six (>= 1.9.0),
+                     python3-subunit,
+                     python3-testtools (>= 0.9.36),
+                     python3-warlock,
                      subunit,
                      testrepository,
 Standards-Version: 3.9.6
@@ -51,7 +70,8 @@ Depends: python-babel,
          ${misc:Depends},
          ${python:Depends},
          ${sphinxdoc:Depends},
-Description: Client library for Openstack glance server
+Suggests: python-glanceclient-doc
+Description: Client library for Openstack glance server - Python 2.x
  The Glance project provides services for discovering, registering, and
  retrieving virtual machine images over the cloud. They may be stand-alone
  services, or may be used to deliver images from object stores, such as
@@ -59,3 +79,47 @@ Description: Client library for Openstack glance server
  .
  This is a client for the Glance which uses the OpenStack Image API. There's a
  Python API (the "glanceclient" module), and a command-line script ("glance").
+ .
+ This package provides the Python 2.x module.
+
+Package: python3-glanceclient
+Architecture: all
+Depends: python3-babel,
+         python3-keystoneclient (>= 1:1.1.0),
+         python3-openssl,
+         python3-oslo.i18n (>= 1.5.0),
+         python3-oslo.utils (>= 1.4.0),
+         python3-pbr,
+         python3-prettytable,
+         python3-requests,
+         python3-six (>= 1.9.0),
+         python3-warlock,
+         ${misc:Depends},
+         ${python3:Depends},
+Suggests: python-glanceclient-doc
+Description: Client library for Openstack glance server - Python 3.x
+ The Glance project provides services for discovering, registering, and
+ retrieving virtual machine images over the cloud. They may be stand-alone
+ services, or may be used to deliver images from object stores, such as
+ OpenStack's Swift service, to Nova's compute nodes.
+ .
+ This is a client for the Glance which uses the OpenStack Image API. There's a
+ Python API (the "glanceclient" module), and a command-line script ("glance").
+ .
+ This package provides the Python 3.x module.
+
+Package: python-glanceclient-doc
+Section: doc
+Architecture: all
+Depends: ${misc:Depends},
+         ${sphinxdoc:Depends},
+Description: Client library for Openstack glance server - doc
+ The Glance project provides services for discovering, registering, and
+ retrieving virtual machine images over the cloud. They may be stand-alone
+ services, or may be used to deliver images from object stores, such as
+ OpenStack's Swift service, to Nova's compute nodes.
+ .
+ This is a client for the Glance which uses the OpenStack Image API. There's a
+ Python API (the "glanceclient" module), and a command-line script ("glance").
+ .
+ This package provides the documentation and man page.

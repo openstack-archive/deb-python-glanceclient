@@ -1,3 +1,9 @@
+python-glanceclient (1:0.18.0-2) experimental; urgency=medium
+
+  * Added Python3 support.
+
+ -- Thomas Goirand <zigo@debian.org>  Thu, 18 Jun 2015 09:26:13 +0000
+
 python-glanceclient (1:0.18.0-1) experimental; urgency=medium
 
   * New upstream release.

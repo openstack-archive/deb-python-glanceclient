@@ -1,22 +1,30 @@
 #!/usr/bin/make -f
 
+PYTHONS:=$(shell pyversions -vr)
+PYTHON3S:=$(shell py3versions -vr)
+
 include /usr/share/openstack-pkg-tools/pkgos.make
 
 export OSLO_PACKAGE_VERSION=$(VERSION)
 
 %:
-	dh $@ --buildsystem=python_distutils --with python2,sphinxdoc
+	dh $@ --buildsystem=python_distutils --with python2,python3,sphinxdoc
 
-override_dh_auto_configure:
-	echo $(VERSION) > glanceclient/versioninfo
-	dh_auto_configure -O--buildsystem=python_distutils
+override_dh_auto_install:
+	set -e ; for pyvers in $(PYTHONS); do \
+		python$$pyvers setup.py install --install-layout=deb \
+			--root $(CURDIR)/debian/python-glanceclient; \
+	done
+	set -e ; for pyvers in $(PYTHON3S); do \
+		python$$pyvers setup.py install --install-layout=deb \
+			--root $(CURDIR)/debian/python3-glanceclient; \
+	done
+	mv $(CURDIR)/debian/python-glanceclient/usr/bin/glance $(CURDIR)/debian/python-glanceclient/usr/bin/python2-glance
+	mv $(CURDIR)/debian/python3-glanceclient/usr/bin/glance $(CURDIR)/debian/python3-glanceclient/usr/bin/python3-glance
 
 override_dh_auto_clean:
-	echo $(VERSION) > glanceclient/versioninfo
 	dh_auto_clean -O--buildsystem=python_distutils
-	rm -f glanceclient/versioninfo
-	rm -f ChangeLog
-	rm -rf .tox .testrepository
+	rm -rf .testrepository build doc/man
 
 override_dh_install:
 	dh_install -O--buildsystem=python_distutils
@@ -25,13 +33,13 @@ override_dh_install:
 override_dh_auto_test:
 ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 	@echo "===> Running tests"
-	set -e ; set -x ; for i in 2.7 ; do \
+	set -e ; set -x ; for i in 2.7 3.4 ; do \
 		PYMAJOR=`echo $$i | cut -d'.' -f1` ; \
 		echo "===> Testing with python$$i (python$$PYMAJOR)" ; \
 		rm -rf .testrepository ; \
 		testr-python$$PYMAJOR init ; \
 		TEMP_REZ=`mktemp -t` ; \
-		PYTHONPATH=$(CURDIR) PYTHON=python$$i testr-python$$PYMAJOR run --subunit 'tests\.(?!.*test_ssl.TestHTTPSVerifyCert.test_v1_requests_cert_verification.*|.*test_ssl.TestHTTPSVerifyCert.test_v2_requests_cert_verification.*)' | tee $$TEMP_REZ | subunit2pyunit ; \
+		PYTHONPATH=$(CURDIR) PYTHON=python$$i testr-python$$PYMAJOR run --subunit 'tests\.(?!.*test_ssl.TestHTTPSVerifyCert.test_v1_requests_cert_verification.*|.*test_ssl.TestHTTPSVerifyCert.test_v2_requests_cert_verification.*|.*test_get_schema.*)' | tee $$TEMP_REZ | subunit2pyunit ; \
  		cat $$TEMP_REZ | subunit-filter -s --no-passthrough | subunit-stats ; \
 		rm -f $$TEMP_REZ ; \
 		testr-python$$PYMAJOR slowest ; \
@@ -46,7 +54,7 @@ endif
 
 override_dh_sphinxdoc:
 ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
-	sphinx-build -b html doc/source $(CURDIR)/debian/python-glanceclient/usr/share/doc/python-glanceclient/html
+	sphinx-build -b html doc/source $(CURDIR)/debian/python-glanceclient-doc/usr/share/doc/python-glanceclient-doc/html
 	dh_sphinxdoc -O--buildsystem=python_distutils
 endif
 
