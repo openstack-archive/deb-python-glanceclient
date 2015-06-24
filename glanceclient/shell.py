@@ -47,6 +47,8 @@ from keystoneclient import session
 osprofiler_profiler = importutils.try_import("osprofiler.profiler")
 _ = _i18n._
 
+SUPPORTED_VERSIONS = [1, 2]
+
 
 class OpenStackImagesShell(object):
 
@@ -291,12 +293,7 @@ class OpenStackImagesShell(object):
 
         self.subcommands = {}
         subparsers = parser.add_subparsers(metavar='<subcommand>')
-        try:
-            submodule = utils.import_versioned_module(version, 'shell')
-        except ImportError:
-            print('"%s" is not a supported API version. Example '
-                  'values are "1" or "2".' % version)
-            utils.exit()
+        submodule = utils.import_versioned_module(version, 'shell')
 
         self._find_actions(subparsers, submodule)
         self._find_actions(subparsers, self)
@@ -556,7 +553,15 @@ class OpenStackImagesShell(object):
     def _cache_schemas(self, options, home_dir='~/.glanceclient'):
         homedir = expanduser(home_dir)
         if not os.path.exists(homedir):
-            os.makedirs(homedir)
+            try:
+                os.makedirs(homedir)
+            except OSError as e:
+                # This avoids glanceclient to crash if it can't write to
+                # ~/.glanceclient, which may happen on some env (for me,
+                # it happens in Jenkins, as Glanceclient can't write to
+                # /var/lib/jenkins).
+                msg = '%s' % e
+                print(encodeutils.safe_decode(msg), file=sys.stderr)
 
         resources = ['image', 'metadefs/namespace', 'metadefs/resource_type']
         schema_file_paths = [homedir + os.sep + x + '_schema.json'
@@ -602,14 +607,32 @@ class OpenStackImagesShell(object):
         # build available subcommands based on version
         try:
             api_version = int(options.os_image_api_version or url_version or 1)
+            if api_version not in SUPPORTED_VERSIONS:
+                raise ValueError
         except ValueError:
-            print("Invalid API version parameter")
-            utils.exit()
+            msg = ("Invalid API version parameter. "
+                   "Supported values are %s" % SUPPORTED_VERSIONS)
+            utils.exit(msg=msg)
 
         if api_version == 2:
             self._cache_schemas(options)
 
-        subcommand_parser = self.get_subcommand_parser(api_version)
+        try:
+            subcommand_parser = self.get_subcommand_parser(api_version)
+        except ImportError as e:
+            if options.debug:
+                traceback.print_exc()
+            if not str(e):
+                # Add a generic import error message if the raised ImportError
+                # has none.
+                raise ImportError('Unable to import module. Re-run '
+                                  'with --debug for more info.')
+            raise
+        except Exception:
+            if options.debug:
+                traceback.print_exc()
+            raise
+
         self.parser = subcommand_parser
 
         # Handle top-level --help/-h before attempting to parse

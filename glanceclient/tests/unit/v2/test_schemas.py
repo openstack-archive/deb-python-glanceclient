@@ -17,8 +17,8 @@ from jsonpatch import JsonPatch
 import testtools
 import warlock
 
+from glanceclient.tests import utils
 from glanceclient.v2 import schemas
-from tests import utils
 
 
 fixtures = {
@@ -121,8 +121,8 @@ class TestController(testtools.TestCase):
     def test_get_schema(self):
         schema = self.controller.get('image')
         self.assertEqual('image', schema.name)
-        self.assertEqual(['name', 'tags'],
-                         [p.name for p in schema.properties])
+        self.assertEqual(set(['name', 'tags']),
+                         set([p.name for p in schema.properties]))
 
 
 class TestSchemaBasedModel(testtools.TestCase):
