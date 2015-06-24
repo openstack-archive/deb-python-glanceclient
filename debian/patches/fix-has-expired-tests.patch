@@ -6,8 +6,8 @@ Author: Corey Bryant <corey.bryant@canonical.com>
 Forwarded: No
 Last-Update: 2015-06-08
 
---- a/tests/test_ssl.py
-+++ b/tests/test_ssl.py
+--- a/glanceclient/tests/unit/test_ssl.py
++++ b/glanceclient/tests/unit/test_ssl.py
 @@ -270,7 +270,7 @@
              conn = https.VerifiedHTTPSConnection('ping.pong.example.com', 0)
              https.do_verify_callback(None, cert, 0, 0, 1, host=conn.host)

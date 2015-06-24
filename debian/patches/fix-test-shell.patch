@@ -1,0 +1,76 @@
+From 8ed1cbb098458d6fd6205df010010f6ce891a587 Mon Sep 17 00:00:00 2001
+From: Corey Bryant <corey.bryant@canonical.com>
+Date: Wed, 24 Jun 2015 15:55:50 -0400
+Subject: [PATCH] Account for dictionary order in test_shell.py
+
+Change-Id: Id15f3d642e8fcbd663f12b32f52b6014e32574a5
+Closes-Bug: 1468485
+---
+ glanceclient/tests/unit/test_shell.py | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/glanceclient/tests/unit/test_shell.py b/glanceclient/tests/unit/test_shell.py
+index d6ce9e6..a6553a5 100644
+--- a/glanceclient/tests/unit/test_shell.py
++++ b/glanceclient/tests/unit/test_shell.py
+@@ -15,6 +15,7 @@
+ #    under the License.
+ 
+ import argparse
++from collections import OrderedDict
+ import os
+ import sys
+ import uuid
+@@ -494,7 +495,8 @@ class ShellCacheSchemaTest(testutils.TestCase):
+         }
+ 
+         self.client = mock.Mock()
+-        self.client.schemas.get.return_value = schemas.Schema(self.schema_dict)
++        schema_odict = OrderedDict(self.schema_dict)
++        self.client.schemas.get.return_value = schemas.Schema(schema_odict)
+ 
+     def _mock_shell_setup(self):
+         mocked_get_client = mock.MagicMock(return_value=self.client)
+@@ -514,6 +516,7 @@ class ShellCacheSchemaTest(testutils.TestCase):
+         options = {
+             'get_schema': True
+         }
++        schema_odict = OrderedDict(self.schema_dict)
+ 
+         self.shell._cache_schemas(self._make_args(options),
+                                   home_dir=self.cache_dir)
+@@ -523,9 +526,9 @@ class ShellCacheSchemaTest(testutils.TestCase):
+                          open.mock_calls[0])
+         self.assertEqual(mock.call(self.cache_files[1], 'w'),
+                          open.mock_calls[4])
+-        self.assertEqual(mock.call().write(json.dumps(self.schema_dict)),
++        self.assertEqual(mock.call().write(json.dumps(schema_odict)),
+                          open.mock_calls[2])
+-        self.assertEqual(mock.call().write(json.dumps(self.schema_dict)),
++        self.assertEqual(mock.call().write(json.dumps(schema_odict)),
+                          open.mock_calls[6])
+ 
+     @mock.patch('six.moves.builtins.open', new=mock.mock_open(), create=True)
+@@ -534,6 +537,7 @@ class ShellCacheSchemaTest(testutils.TestCase):
+         options = {
+             'get_schema': False
+         }
++        schema_odict = OrderedDict(self.schema_dict)
+ 
+         self.shell._cache_schemas(self._make_args(options),
+                                   home_dir=self.cache_dir)
+@@ -543,9 +547,9 @@ class ShellCacheSchemaTest(testutils.TestCase):
+                          open.mock_calls[0])
+         self.assertEqual(mock.call(self.cache_files[1], 'w'),
+                          open.mock_calls[4])
+-        self.assertEqual(mock.call().write(json.dumps(self.schema_dict)),
++        self.assertEqual(mock.call().write(json.dumps(schema_odict)),
+                          open.mock_calls[2])
+-        self.assertEqual(mock.call().write(json.dumps(self.schema_dict)),
++        self.assertEqual(mock.call().write(json.dumps(schema_odict)),
+                          open.mock_calls[6])
+ 
+     @mock.patch('six.moves.builtins.open', new=mock.mock_open(), create=True)
+-- 
+2.1.4
+
