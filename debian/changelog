@@ -1,3 +1,13 @@
+python-glanceclient (1:0.19.0-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+    - d/control: Align requirements with upstream.
+    - d/p/do-not-crash-on-homedir-creation.patch: Dropped; Fixed upstream.
+    - d/p/fix-has-expired-tests.patch: Rebased.
+    - d/p/fix-test-shell.patch: Added to fix failing tests.
+
+ -- Corey Bryant <corey.bryant@canonical.com>  Wed, 24 Jun 2015 12:08:51 -0400
+
 python-glanceclient (1:0.18.0-2) experimental; urgency=medium
 
   * Added Python3 support.
