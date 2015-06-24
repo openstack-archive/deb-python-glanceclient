@@ -1,4 +1,4 @@
-python-glanceclient (1:0.19.0-1) UNRELEASED; urgency=medium
+python-glanceclient (1:0.19.0-1) experimental; urgency=medium
 
   * New upstream release.
     - d/control: Align requirements with upstream.
