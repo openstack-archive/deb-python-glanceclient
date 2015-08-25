@@ -31,7 +31,7 @@ ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 		rm -rf .testrepository ; \
 		testr-python$$PYMAJOR init ; \
 		TEMP_REZ=`mktemp -t` ; \
-		PYTHONPATH=$(CURDIR) PYTHON=python$$i testr-python$$PYMAJOR run --subunit 'tests\.(?!.*test_ssl.TestHTTPSVerifyCert.test_v1_requests_cert_verification.*|.*test_ssl.TestHTTPSVerifyCert.test_v2_requests_cert_verification.*)' | tee $$TEMP_REZ | subunit2pyunit ; \
+		PYTHONPATH=$(CURDIR) PYTHON=python$$i testr-python$$PYMAJOR run --subunit 'tests\.(?!.*test_ssl\.TestVerifiedHTTPSConnection\.test_ssl_cert_cname_wildcard.*|.*test_ssl.TestVerifiedHTTPSConnection.test_ssl_cert_subject_alt_name_wildcard.*|.*v2\.test_shell_v2\.ShellV2Test\.test_do_md_resource_type_list.*|.*test_ssl.TestHTTPSVerifyCert.test_v1_requests_cert_verification.*|.*test_ssl.TestHTTPSVerifyCert.test_v2_requests_cert_verification.*)' | tee $$TEMP_REZ | subunit2pyunit ; \
  		cat $$TEMP_REZ | subunit-filter -s --no-passthrough | subunit-stats ; \
 		rm -f $$TEMP_REZ ; \
 		testr-python$$PYMAJOR slowest ; \
