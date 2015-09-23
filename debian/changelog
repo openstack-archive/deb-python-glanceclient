@@ -1,3 +1,9 @@
+python-glanceclient (1:1.1.0-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+
+ -- Corey Bryant <corey.bryant@canonical.com>  Wed, 23 Sep 2015 15:40:13 -0400
+
 python-glanceclient (1:0.19.0-1) experimental; urgency=medium
 
   * New upstream release.
