@@ -18,24 +18,28 @@ import sys
 from glanceclient.common import progressbar
 from glanceclient.common import utils
 from glanceclient import exc
-from glanceclient.v2.image_members import MEMBER_STATUS_VALUES
+from glanceclient.v2 import image_members
+from glanceclient.v2 import image_schema
 from glanceclient.v2 import images
 from glanceclient.v2 import tasks
 import json
 import os
-from os.path import expanduser
 
+MEMBER_STATUS_VALUES = image_members.MEMBER_STATUS_VALUES
 IMAGE_SCHEMA = None
+DATA_FIELDS = ('location', 'copy_from', 'file')
 
 
 def get_image_schema():
     global IMAGE_SCHEMA
     if IMAGE_SCHEMA is None:
-        schema_path = expanduser("~/.glanceclient/image_schema.json")
+        schema_path = os.path.expanduser("~/.glanceclient/image_schema.json")
         if os.path.isfile(schema_path):
             with open(schema_path, "r") as f:
                 schema_raw = f.read()
                 IMAGE_SCHEMA = json.loads(schema_raw)
+        else:
+            return image_schema._BASE_SCHEMA
     return IMAGE_SCHEMA
 
 
@@ -52,6 +56,7 @@ def get_image_schema():
                 'to the client via stdin.')
 @utils.arg('--progress', action='store_true', default=False,
            help='Show upload progress bar.')
+@utils.on_data_require_fields(DATA_FIELDS)
 def do_image_create(gc, args):
     """Create a new image."""
     schema = gc.schemas.get("image")
@@ -137,8 +142,8 @@ def do_image_update(gc, args):
            help='Sort image list in specified directions.')
 @utils.arg('--sort', metavar='<key>[:<direction>]', default=None,
            help=(("Comma-separated list of sort keys and directions in the "
-                  "form of <key>[:<asc|desc>]. Valid keys: %s. OPTIONAL: "
-                  "Default='name:asc'.") % ', '.join(images.SORT_KEY_VALUES)))
+                  "form of <key>[:<asc|desc>]. Valid keys: %s. OPTIONAL."
+                  ) % ', '.join(images.SORT_KEY_VALUES)))
 def do_image_list(gc, args):
     """List images you can access."""
     filter_keys = ['visibility', 'member_status', 'owner', 'checksum', 'tag']
@@ -164,12 +169,14 @@ def do_image_list(gc, args):
     if args.sort is not None:
         kwargs['sort'] = args.sort
     elif not args.sort_dir and not args.sort_key:
-        kwargs['sort'] = 'name:asc'
+        kwargs['sort_key'] = 'name'
+        kwargs['sort_dir'] = 'asc'
 
     columns = ['ID', 'Name']
 
     if args.verbose:
-        columns += ['owner', 'status']
+        columns += ['Disk_format', 'Container_format', 'Size', 'Status',
+                    'Owner']
 
     images = gc.images.list(**kwargs)
     utils.print_list(images, columns)
@@ -394,7 +401,8 @@ NAMESPACE_SCHEMA = None
 def get_namespace_schema():
     global NAMESPACE_SCHEMA
     if NAMESPACE_SCHEMA is None:
-        schema_path = expanduser("~/.glanceclient/namespace_schema.json")
+        schema_path = os.path.expanduser("~/.glanceclient/"
+                                         "namespace_schema.json")
         if os.path.isfile(schema_path):
             with open(schema_path, "r") as f:
                 schema_raw = f.read()
@@ -415,6 +423,10 @@ def _namespace_show(namespace, max_column_width=None):
     if 'objects' in namespace:
         objects = [obj['name'] for obj in namespace['objects']]
         namespace['objects'] = objects
+
+    if 'tags' in namespace:
+        tags = [tag['name'] for tag in namespace['tags']]
+        namespace['tags'] = tags
 
     if max_column_width:
         utils.print_dict(namespace, max_column_width)
@@ -533,7 +545,8 @@ RESOURCE_TYPE_SCHEMA = None
 def get_resource_type_schema():
     global RESOURCE_TYPE_SCHEMA
     if RESOURCE_TYPE_SCHEMA is None:
-        schema_path = expanduser("~/.glanceclient/resource_type_schema.json")
+        schema_path = os.path.expanduser("~/.glanceclient/"
+                                         "resource_type_schema.json")
         if os.path.isfile(schema_path):
             with open(schema_path, "r") as f:
                 schema_raw = f.read()
@@ -771,6 +784,116 @@ def do_md_object_list(gc, args):
         }
     }
     utils.print_list(objects, columns, field_settings=column_settings)
+
+
+def _tag_show(tag, max_column_width=None):
+    tag = dict(tag)  # Warlock objects are compatible with dicts
+    if max_column_width:
+        utils.print_dict(tag, max_column_width)
+    else:
+        utils.print_dict(tag)
+
+
+@utils.arg('namespace', metavar='<NAMESPACE>',
+           help='Name of the namespace the tag will belong to.')
+@utils.arg('--name', metavar='<NAME>', required=True,
+           help='The name of the new tag to add.')
+def do_md_tag_create(gc, args):
+    """Add a new metadata definitions tag inside a namespace."""
+    name = args.name.strip()
+    if name:
+        new_tag = gc.metadefs_tag.create(args.namespace, name)
+        _tag_show(new_tag)
+    else:
+        utils.exit('Please supply at least one non-blank tag name.')
+
+
+@utils.arg('namespace', metavar='<NAMESPACE>',
+           help='Name of the namespace the tags will belong to.')
+@utils.arg('--names', metavar='<NAMES>', required=True,
+           help='A comma separated list of tag names.')
+@utils.arg('--delim', metavar='<DELIM>', required=False,
+           help='The delimiter used to separate the names'
+                ' (if none is provided then the default is a comma).')
+def do_md_tag_create_multiple(gc, args):
+    """Create new metadata definitions tags inside a namespace."""
+    delim = args.delim or ','
+
+    tags = []
+    names_list = args.names.split(delim)
+    for name in names_list:
+        name = name.strip()
+        if name:
+            tags.append(name)
+
+    if not tags:
+        utils.exit('Please supply at least one tag name. For example: '
+                   '--names Tag1')
+
+    fields = {'tags': tags}
+    new_tags = gc.metadefs_tag.create_multiple(args.namespace, **fields)
+    columns = ['name']
+    column_settings = {
+        "description": {
+            "max_width": 50,
+            "align": "l"
+        }
+    }
+    utils.print_list(new_tags, columns, field_settings=column_settings)
+
+
+@utils.arg('namespace', metavar='<NAMESPACE>',
+           help='Name of the namespace to which the tag belongs.')
+@utils.arg('tag', metavar='<TAG>', help='Name of the old tag.')
+@utils.arg('--name', metavar='<NAME>', default=None, required=True,
+           help='New name of the new tag.')
+def do_md_tag_update(gc, args):
+    """Rename a metadata definitions tag inside a namespace."""
+    name = args.name.strip()
+    if name:
+        fields = {'name': name}
+        new_tag = gc.metadefs_tag.update(args.namespace, args.tag,
+                                         **fields)
+        _tag_show(new_tag)
+    else:
+        utils.exit('Please supply at least one non-blank tag name.')
+
+
+@utils.arg('namespace', metavar='<NAMESPACE>',
+           help='Name of the namespace to which the tag belongs.')
+@utils.arg('tag', metavar='<TAG>', help='Name of the tag.')
+def do_md_tag_show(gc, args):
+    """Describe a specific metadata definitions tag inside a namespace."""
+    tag = gc.metadefs_tag.get(args.namespace, args.tag)
+    _tag_show(tag)
+
+
+@utils.arg('namespace', metavar='<NAMESPACE>',
+           help='Name of the namespace to which the tag belongs.')
+@utils.arg('tag', metavar='<TAG>', help='Name of the tag.')
+def do_md_tag_delete(gc, args):
+    """Delete a specific metadata definitions tag inside a namespace."""
+    gc.metadefs_tag.delete(args.namespace, args.tag)
+
+
+@utils.arg('namespace', metavar='<NAMESPACE>', help='Name of namespace.')
+def do_md_namespace_tags_delete(gc, args):
+    """Delete all metadata definitions tags inside a specific namespace."""
+    gc.metadefs_tag.delete_all(args.namespace)
+
+
+@utils.arg('namespace', metavar='<NAMESPACE>', help='Name of namespace.')
+def do_md_tag_list(gc, args):
+    """List metadata definitions tags inside a specific namespace."""
+    tags = gc.metadefs_tag.list(args.namespace)
+    columns = ['name']
+    column_settings = {
+        "description": {
+            "max_width": 50,
+            "align": "l"
+        }
+    }
+    utils.print_list(tags, columns, field_settings=column_settings)
 
 
 @utils.arg('--sort-key', default='status',

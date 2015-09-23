@@ -402,7 +402,7 @@ class CrudManager(BaseManager):
                 'name': self.resource_class.__name__,
                 'args': kwargs
             }
-            raise exceptions.NotFound(404, msg)
+            raise exceptions.NotFound(msg)
         elif num > 1:
             raise exceptions.NoUniqueMatch
         else:
@@ -467,8 +467,7 @@ class Resource(object):
 
     @property
     def human_id(self):
-        """Human-readable ID which can be used for bash completion.
-        """
+        """Human-readable ID which can be used for bash completion."""
         if self.HUMAN_ID:
             name = getattr(self, self.NAME_ATTR, None)
             if name is not None:

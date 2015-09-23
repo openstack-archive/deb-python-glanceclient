@@ -16,11 +16,47 @@
 import json
 import mock
 import os
+import six
 import tempfile
 import testtools
 
 from glanceclient.common import utils
+from glanceclient import exc
+from glanceclient import shell
+
+# NOTE(geguileo): This is very nasty, but I can't find a better way to set
+# command line arguments in glanceclient.v2.shell.do_image_create that are
+# set by decorator utils.schema_args while preserving the spirits of the test
+
+# Backup original decorator
+original_schema_args = utils.schema_args
+
+
+# Set our own decorator that calls the original but with simulated schema
+def schema_args(schema_getter, omit=None):
+    global original_schema_args
+    # We only add the 2 arguments that are required by image-create
+    my_schema_getter = lambda: {
+        'properties': {
+            'container_format': {
+                'enum': [None, 'ami', 'ari', 'aki', 'bare', 'ovf', 'ova'],
+                'type': 'string',
+                'description': 'Format of the container'},
+            'disk_format': {
+                'enum': [None, 'ami', 'ari', 'aki', 'vhd', 'vmdk', 'raw',
+                         'qcow2', 'vdi', 'iso'],
+                'type': 'string',
+                'description': 'Format of the disk'},
+            'location': {'type': 'string'},
+            'locations': {'type': 'string'},
+            'copy_from': {'type': 'string'}}}
+    return original_schema_args(my_schema_getter, omit)
+utils.schema_args = schema_args
+
 from glanceclient.v2 import shell as test_shell
+
+# Return original decorator.
+utils.schema_args = original_schema_args
 
 
 class ShellV2Test(testtools.TestCase):
@@ -28,13 +64,32 @@ class ShellV2Test(testtools.TestCase):
         super(ShellV2Test, self).setUp()
         self._mock_utils()
         self.gc = self._mock_glance_client()
+        self.shell = shell.OpenStackImagesShell()
+        os.environ = {
+            'OS_USERNAME': 'username',
+            'OS_PASSWORD': 'password',
+            'OS_TENANT_ID': 'tenant_id',
+            'OS_TOKEN_ID': 'test',
+            'OS_AUTH_URL': 'http://127.0.0.1:5000/v2.0/',
+            'OS_AUTH_TOKEN': 'pass',
+            'OS_IMAGE_API_VERSION': '1',
+            'OS_REGION_NAME': 'test',
+            'OS_IMAGE_URL': 'http://is.invalid'}
+        self.shell = shell.OpenStackImagesShell()
+        self.patched = mock.patch('glanceclient.common.utils.get_data_file',
+                                  autospec=True, return_value=None)
+        self.mock_get_data_file = self.patched.start()
+
+    def tearDown(self):
+        super(ShellV2Test, self).tearDown()
+        self.patched.stop()
 
     def _make_args(self, args):
-        #NOTE(venkatesh): this conversion from a dict to an object
+        # NOTE(venkatesh): this conversion from a dict to an object
         # is required because the test_shell.do_xxx(gc, args) methods
         # expects the args to be attributes of an object. If passed as
         # dict directly, it throws an AttributeError.
-        class Args():
+        class Args(object):
             def __init__(self, entries):
                 self.__dict__.update(entries)
 
@@ -58,6 +113,49 @@ class ShellV2Test(testtools.TestCase):
             func(self.gc, func_args)
 
             mocked_utils_exit.assert_called_once_with(err_msg)
+
+    def _run_command(self, cmd):
+        self.shell.main(cmd.split())
+
+    @mock.patch('sys.stderr')
+    def test_image_create_missing_disk_format(self, __):
+        # We test for all possible sources
+        for origin in ('--file', '--location', '--copy-from'):
+            e = self.assertRaises(exc.CommandError, self._run_command,
+                                  '--os-image-api-version 2 image-create ' +
+                                  origin + ' fake_src --container-format bare')
+            self.assertEqual('error: Must provide --disk-format when using '
+                             + origin + '.', e.message)
+
+    @mock.patch('sys.stderr')
+    def test_image_create_missing_container_format(self, __):
+        # We test for all possible sources
+        for origin in ('--file', '--location', '--copy-from'):
+            e = self.assertRaises(exc.CommandError, self._run_command,
+                                  '--os-image-api-version 2 image-create ' +
+                                  origin + ' fake_src --disk-format qcow2')
+            self.assertEqual('error: Must provide --container-format when '
+                             'using ' + origin + '.', e.message)
+
+    @mock.patch('sys.stderr')
+    def test_image_create_missing_container_format_stdin_data(self, __):
+        # Fake that get_data_file method returns data
+        self.mock_get_data_file.return_value = six.StringIO()
+        e = self.assertRaises(exc.CommandError, self._run_command,
+                              '--os-image-api-version 2 image-create'
+                              ' --disk-format qcow2')
+        self.assertEqual('error: Must provide --container-format when '
+                         'using stdin.', e.message)
+
+    @mock.patch('sys.stderr')
+    def test_image_create_missing_disk_format_stdin_data(self, __):
+        # Fake that get_data_file method returns data
+        self.mock_get_data_file.return_value = six.StringIO()
+        e = self.assertRaises(exc.CommandError, self._run_command,
+                              '--os-image-api-version 2 image-create'
+                              ' --container-format bare')
+        self.assertEqual('error: Must provide --disk-format when using stdin.',
+                         e.message)
 
     def test_do_image_list(self):
         input = {
@@ -261,6 +359,7 @@ class ShellV2Test(testtools.TestCase):
                 'container_format': 'bare'})
 
     def test_do_image_create_with_file(self):
+        self.mock_get_data_file.return_value = six.StringIO()
         try:
             file_name = None
             with open(tempfile.mktemp(), 'w+') as f:
@@ -305,7 +404,9 @@ class ShellV2Test(testtools.TestCase):
     def test_do_image_create_with_user_props(self, mock_stdin):
         args = self._make_args({'name': 'IMG-01',
                                 'property': ['myprop=myval'],
-                                'file': None})
+                                'file': None,
+                                'container_format': 'bare',
+                                'disk_format': 'qcow2'})
         with mock.patch.object(self.gc.images, 'create') as mocked_create:
             ignore_fields = ['self', 'access', 'file', 'schema']
             expect_image = dict([(field, field) for field in ignore_fields])
@@ -320,7 +421,9 @@ class ShellV2Test(testtools.TestCase):
             test_shell.do_image_create(self.gc, args)
 
             mocked_create.assert_called_once_with(name='IMG-01',
-                                                  myprop='myval')
+                                                  myprop='myval',
+                                                  container_format='bare',
+                                                  disk_format='qcow2')
             utils.print_dict.assert_called_once_with({
                 'id': 'pass', 'name': 'IMG-01', 'myprop': 'myval'})
 
@@ -833,7 +936,7 @@ class ShellV2Test(testtools.TestCase):
 
             test_shell.do_md_resource_type_list(self.gc, args)
 
-            mocked_list.assert_called_once()
+            self.assertEqual(1, mocked_list.call_count)
 
     def test_do_md_namespace_resource_type_list(self):
         args = self._make_args({'namespace': 'MyNamespace'})
@@ -1094,5 +1197,109 @@ class ShellV2Test(testtools.TestCase):
             utils.print_list.assert_called_once_with(
                 expect_objects,
                 ['name', 'description'],
+                field_settings={
+                    'description': {'align': 'l', 'max_width': 50}})
+
+    def test_do_md_tag_create(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'name': 'MyTag'})
+        with mock.patch.object(self.gc.metadefs_tag,
+                               'create') as mocked_create:
+            expect_tag = {}
+            expect_tag['namespace'] = 'MyNamespace'
+            expect_tag['name'] = 'MyTag'
+
+            mocked_create.return_value = expect_tag
+
+            test_shell.do_md_tag_create(self.gc, args)
+
+            mocked_create.assert_called_once_with('MyNamespace', 'MyTag')
+            utils.print_dict.assert_called_once_with(expect_tag)
+
+    def test_do_md_tag_update(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'tag': 'MyTag',
+                                'name': 'NewTag'})
+        with mock.patch.object(self.gc.metadefs_tag,
+                               'update') as mocked_update:
+            expect_tag = {}
+            expect_tag['namespace'] = 'MyNamespace'
+            expect_tag['name'] = 'NewTag'
+
+            mocked_update.return_value = expect_tag
+
+            test_shell.do_md_tag_update(self.gc, args)
+
+            mocked_update.assert_called_once_with('MyNamespace', 'MyTag',
+                                                  name='NewTag')
+            utils.print_dict.assert_called_once_with(expect_tag)
+
+    def test_do_md_tag_show(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'tag': 'MyTag',
+                                'sort_dir': 'desc'})
+        with mock.patch.object(self.gc.metadefs_tag, 'get') as mocked_get:
+            expect_tag = {}
+            expect_tag['namespace'] = 'MyNamespace'
+            expect_tag['tag'] = 'MyTag'
+
+            mocked_get.return_value = expect_tag
+
+            test_shell.do_md_tag_show(self.gc, args)
+
+            mocked_get.assert_called_once_with('MyNamespace', 'MyTag')
+            utils.print_dict.assert_called_once_with(expect_tag)
+
+    def test_do_md_tag_delete(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'tag': 'MyTag'})
+        with mock.patch.object(self.gc.metadefs_tag,
+                               'delete') as mocked_delete:
+            test_shell.do_md_tag_delete(self.gc, args)
+
+            mocked_delete.assert_called_once_with('MyNamespace', 'MyTag')
+
+    def test_do_md_namespace_tags_delete(self):
+        args = self._make_args({'namespace': 'MyNamespace'})
+        with mock.patch.object(self.gc.metadefs_tag,
+                               'delete_all') as mocked_delete_all:
+            test_shell.do_md_namespace_tags_delete(self.gc, args)
+
+            mocked_delete_all.assert_called_once_with('MyNamespace')
+
+    def test_do_md_tag_list(self):
+        args = self._make_args({'namespace': 'MyNamespace'})
+        with mock.patch.object(self.gc.metadefs_tag, 'list') as mocked_list:
+            expect_tags = [{'namespace': 'MyNamespace',
+                            'tag': 'MyTag'}]
+
+            mocked_list.return_value = expect_tags
+
+            test_shell.do_md_tag_list(self.gc, args)
+
+            mocked_list.assert_called_once_with('MyNamespace')
+            utils.print_list.assert_called_once_with(
+                expect_tags,
+                ['name'],
+                field_settings={
+                    'description': {'align': 'l', 'max_width': 50}})
+
+    def test_do_md_tag_create_multiple(self):
+        args = self._make_args({'namespace': 'MyNamespace',
+                                'delim': ',',
+                                'names': 'MyTag1, MyTag2'})
+        with mock.patch.object(
+                self.gc.metadefs_tag, 'create_multiple') as mocked_create_tags:
+            expect_tags = [{'tags': [{'name': 'MyTag1'}, {'name': 'MyTag2'}]}]
+
+            mocked_create_tags.return_value = expect_tags
+
+            test_shell.do_md_tag_create_multiple(self.gc, args)
+
+            mocked_create_tags.assert_called_once_with(
+                'MyNamespace', tags=['MyTag1', 'MyTag2'])
+            utils.print_list.assert_called_once_with(
+                expect_tags,
+                ['name'],
                 field_settings={
                     'description': {'align': 'l', 'max_width': 50}})

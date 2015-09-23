@@ -26,7 +26,7 @@ from glanceclient.openstack.common.apiclient import base
 UPDATE_PARAMS = ('name', 'disk_format', 'container_format', 'min_disk',
                  'min_ram', 'owner', 'size', 'is_public', 'protected',
                  'location', 'checksum', 'copy_from', 'properties',
-                 #NOTE(bcwaldon: an attempt to update 'deleted' will be
+                 # NOTE(bcwaldon: an attempt to update 'deleted' will be
                  # ignored, but we need to support it for backwards-
                  # compatibility with the legacy client library
                  'deleted')
@@ -73,6 +73,11 @@ class ImageManager(base.ManagerWithFind):
         meta = {'properties': {}}
         safe_decode = encodeutils.safe_decode
         for key, value in six.iteritems(headers):
+            # NOTE(flaper87): this is a compatibility fix
+            # for urllib3 >= 1.11. Please, refer to this
+            # bug for more info:
+            # https://bugs.launchpad.net/python-glanceclient/+bug/1487645
+            key = key.lower()
             value = safe_decode(value, incoming='utf-8')
             if key.startswith('x-image-meta-property-'):
                 _key = safe_decode(key[22:], incoming='utf-8')
@@ -289,7 +294,7 @@ class ImageManager(base.ManagerWithFind):
             return_request_id.append(resp.headers.get(OS_REQ_ID_HDR, None))
 
     def create(self, **kwargs):
-        """Create an image
+        """Create an image.
 
         TODO(bcwaldon): document accepted params
         """
@@ -324,7 +329,7 @@ class ImageManager(base.ManagerWithFind):
         return Image(self, self._format_image_meta_for_user(body['image']))
 
     def update(self, image, **kwargs):
-        """Update an image
+        """Update an image.
 
         TODO(bcwaldon): document accepted params
         """

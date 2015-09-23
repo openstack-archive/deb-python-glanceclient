@@ -15,6 +15,8 @@
 
 import sys
 
+import mock
+from oslo_utils import encodeutils
 import six
 # NOTE(jokke): simplified transition to py3, behaves like py2 xrange
 from six.moves import range
@@ -54,7 +56,7 @@ class TestUtils(testtools.TestCase):
             file_obj.close()
 
     def test_prettytable(self):
-        class Struct:
+        class Struct(object):
             def __init__(self, **entries):
                 self.__dict__.update(entries)
 
@@ -151,7 +153,7 @@ class TestUtils(testtools.TestCase):
         decorated = utils.schema_args(schema_getter())(dummy_func)
         arg, opts = decorated.__dict__['arguments'][0]
         self.assertIn('--test', arg)
-        self.assertEqual(str, opts['type'])
+        self.assertEqual(encodeutils.safe_decode, opts['type'])
 
         decorated = utils.schema_args(schema_getter('integer'))(dummy_func)
         arg, opts = decorated.__dict__['arguments'][0]
@@ -161,5 +163,32 @@ class TestUtils(testtools.TestCase):
         decorated = utils.schema_args(schema_getter(enum=True))(dummy_func)
         arg, opts = decorated.__dict__['arguments'][0]
         self.assertIn('--test', arg)
-        self.assertEqual(str, opts['type'])
+        self.assertEqual(encodeutils.safe_decode, opts['type'])
         self.assertIn('None, opt-1, opt-2', opts['help'])
+
+    def test_iterable_closes(self):
+        # Regression test for bug 1461678.
+        def _iterate(i):
+            for chunk in i:
+                raise(IOError)
+
+        data = six.moves.StringIO('somestring')
+        data.close = mock.Mock()
+        i = utils.IterableWithLength(data, 10)
+        self.assertRaises(IOError, _iterate, i)
+        data.close.assert_called_with()
+
+    def test_safe_header(self):
+        self.assertEqual(('somekey', 'somevalue'),
+                         utils.safe_header('somekey', 'somevalue'))
+        self.assertEqual(('somekey', None),
+                         utils.safe_header('somekey', None))
+
+        for sensitive_header in utils.SENSITIVE_HEADERS:
+            (name, value) = utils.safe_header(sensitive_header, 'somestring')
+            self.assertEqual(sensitive_header, name)
+            self.assertTrue(value.startswith("{SHA1}"))
+
+            (name, value) = utils.safe_header(sensitive_header, None)
+            self.assertEqual(sensitive_header, name)
+            self.assertIsNone(value)

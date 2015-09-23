@@ -232,10 +232,32 @@ class ShellInvalidEndpointandParameterTest(utils.TestCase):
             'OS_IMAGE_URL': 'http://is.invalid'}
 
         self.shell = shell.OpenStackImagesShell()
+        self.patched = mock.patch('glanceclient.common.utils.get_data_file',
+                                  autospec=True, return_value=None)
+        self.mock_get_data_file = self.patched.start()
+
+        self.gc = self._mock_glance_client()
+
+    def _make_args(self, args):
+        # NOTE(venkatesh): this conversion from a dict to an object
+        # is required because the test_shell.do_xxx(gc, args) methods
+        # expects the args to be attributes of an object. If passed as
+        # dict directly, it throws an AttributeError.
+        class Args(object):
+            def __init__(self, entries):
+                self.__dict__.update(entries)
+
+        return Args(args)
+
+    def _mock_glance_client(self):
+        my_mocked_gc = mock.Mock()
+        my_mocked_gc.get.return_value = {}
+        return my_mocked_gc
 
     def tearDown(self):
         super(ShellInvalidEndpointandParameterTest, self).tearDown()
         os.environ = self.old_environment
+        self.patched.stop()
 
     def run_command(self, cmd):
         self.shell.main(cmd.split())
@@ -306,6 +328,46 @@ class ShellInvalidEndpointandParameterTest(utils.TestCase):
             self.run_command, 'image-create --min-disk 10gb')
 
     @mock.patch('sys.stderr')
+    def test_image_create_missing_disk_format(self, __):
+        # We test for all possible sources
+        for origin in ('--file', '--location', '--copy-from'):
+            e = self.assertRaises(exc.CommandError, self.run_command,
+                                  '--os-image-api-version 1 image-create ' +
+                                  origin + ' fake_src --container-format bare')
+            self.assertEqual('error: Must provide --disk-format when using '
+                             + origin + '.', e.message)
+
+    @mock.patch('sys.stderr')
+    def test_image_create_missing_container_format(self, __):
+        # We test for all possible sources
+        for origin in ('--file', '--location', '--copy-from'):
+            e = self.assertRaises(exc.CommandError, self.run_command,
+                                  '--os-image-api-version 1 image-create ' +
+                                  origin + ' fake_src --disk-format qcow2')
+            self.assertEqual('error: Must provide --container-format when '
+                             'using ' + origin + '.', e.message)
+
+    @mock.patch('sys.stderr')
+    def test_image_create_missing_container_format_stdin_data(self, __):
+        # Fake that get_data_file method returns data
+        self.mock_get_data_file.return_value = six.StringIO()
+        e = self.assertRaises(exc.CommandError, self.run_command,
+                              '--os-image-api-version 1 image-create'
+                              ' --disk-format qcow2')
+        self.assertEqual('error: Must provide --container-format when '
+                         'using stdin.', e.message)
+
+    @mock.patch('sys.stderr')
+    def test_image_create_missing_disk_format_stdin_data(self, __):
+        # Fake that get_data_file method returns data
+        self.mock_get_data_file.return_value = six.StringIO()
+        e = self.assertRaises(exc.CommandError, self.run_command,
+                              '--os-image-api-version 1 image-create'
+                              ' --container-format bare')
+        self.assertEqual('error: Must provide --disk-format when using stdin.',
+                         e.message)
+
+    @mock.patch('sys.stderr')
     def test_image_update_invalid_size_parameter(self, __):
         self.assertRaises(
             SystemExit,
@@ -335,14 +397,55 @@ class ShellInvalidEndpointandParameterTest(utils.TestCase):
             SystemExit,
             self.run_command, 'image-list --size-max 10gb')
 
+    def test_do_image_list_with_changes_since(self):
+        input = {
+            'name': None,
+            'limit': None,
+            'status': None,
+            'container_format': 'bare',
+            'size_min': None,
+            'size_max': None,
+            'is_public': True,
+            'disk_format': 'raw',
+            'page_size': 20,
+            'visibility': True,
+            'member_status': 'Fake',
+            'owner': 'test',
+            'checksum': 'fake_checksum',
+            'tag': 'fake tag',
+            'properties': [],
+            'sort_key': None,
+            'sort_dir': None,
+            'all_tenants': False,
+            'human_readable': True,
+            'changes_since': '2011-1-1'
+        }
+        args = self._make_args(input)
+        with mock.patch.object(self.gc.images, 'list') as mocked_list:
+            mocked_list.return_value = {}
+
+            v1shell.do_image_list(self.gc, args)
+
+            exp_img_filters = {'container_format': 'bare',
+                               'changes-since': '2011-1-1',
+                               'disk_format': 'raw',
+                               'is_public': True}
+            mocked_list.assert_called_once_with(sort_dir=None,
+                                                sort_key=None,
+                                                owner='test',
+                                                page_size=20,
+                                                filters=exp_img_filters)
+
 
 class ShellStdinHandlingTests(testtools.TestCase):
 
     def _fake_update_func(self, *args, **kwargs):
-        '''Function to replace glanceclient.images.update,
+        """
+
+        Function to replace glanceclient.images.update,
         to determine the parameters that would be supplied with the update
         request
-        '''
+        """
 
         # Store passed in args
         self.collected_args = (args, kwargs)
@@ -420,7 +523,9 @@ class ShellStdinHandlingTests(testtools.TestCase):
         )
 
     def test_image_update_closed_stdin(self):
-        """Supply glanceclient with a closed stdin, and perform an image
+        """
+
+        Supply glanceclient with a closed stdin, and perform an image
         update to an active image. Glanceclient should not attempt to read
         stdin.
         """
@@ -437,7 +542,9 @@ class ShellStdinHandlingTests(testtools.TestCase):
         )
 
     def test_image_update_opened_stdin(self):
-        """Supply glanceclient with a stdin, and perform an image
+        """
+
+        Supply glanceclient with a stdin, and perform an image
         update to an active image. Glanceclient should not allow it.
         """
 
