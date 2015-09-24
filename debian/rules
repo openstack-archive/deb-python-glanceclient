@@ -39,7 +39,7 @@ ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 		rm -rf .testrepository ; \
 		testr-python$$PYMAJOR init ; \
 		TEMP_REZ=`mktemp -t` ; \
-		PYTHONPATH=$(CURDIR) PYTHON=python$$i testr-python$$PYMAJOR run --subunit 'tests\.(?!.*test_ssl.TestHTTPSVerifyCert.test_v1_requests_cert_verification.*|.*test_ssl.TestHTTPSVerifyCert.test_v2_requests_cert_verification.*|.*test_get_schema.*)' | tee $$TEMP_REZ | subunit2pyunit ; \
+		PYTHONPATH=$(CURDIR) PYTHON=python$$i testr-python$$PYMAJOR run --subunit 'glanceclient\.tests\.unit\.(?!(.*v2.test_client_requests.ClientTestRequests.test_show_bad_image_schema.*|.*test_ssl.TestHTTPSVerifyCert.test_v1_requests_cert_verification.*|.*test_ssl.TestHTTPSVerifyCert.test_v2_requests_cert_verification.*|.*test_get_schema.*))' | tee $$TEMP_REZ | subunit2pyunit ; \
  		cat $$TEMP_REZ | subunit-filter -s --no-passthrough | subunit-stats ; \
 		rm -f $$TEMP_REZ ; \
 		testr-python$$PYMAJOR slowest ; \

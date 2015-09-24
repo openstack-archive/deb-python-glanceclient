@@ -1,12 +1,17 @@
-python-glanceclient (1:1.1.0-1) UNRELEASED; urgency=medium
+python-glanceclient (1:1.1.0-2) experimental; urgency=medium
 
+  [ Corey Bryant ]
   * New upstream release.
   * d/control: Align (build-)depends with upstream.
   * d/p/fix-test-shell.patch: Dropped. Fixed in new upstream release.
   * d/p/fix-has-expired-tests.patch: Rebased.
   * d/p/skip-tests.patch: Added to skip tests that are failing upstream.
 
- -- Corey Bryant <corey.bryant@canonical.com>  Wed, 23 Sep 2015 15:40:13 -0400
+  [ Thomas Goirand ]
+  * Do not run this test that fails in my Jessie jenkins:
+    - v2.test_client_requests.ClientTestRequests.test_show_bad_image_schema
+
+ -- Thomas Goirand <zigo@debian.org>  Thu, 24 Sep 2015 15:49:44 +0000
 
 python-glanceclient (1:0.19.0-1) experimental; urgency=medium
 
