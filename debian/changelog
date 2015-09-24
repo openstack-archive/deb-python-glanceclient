@@ -1,4 +1,4 @@
-python-glanceclient (1:1.1.0-2) experimental; urgency=medium
+python-glanceclient (1:1.1.0-1) experimental; urgency=medium
 
   [ Corey Bryant ]
   * New upstream release.
