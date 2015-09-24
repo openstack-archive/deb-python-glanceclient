@@ -4,6 +4,7 @@ python-glanceclient (1:1.1.0-1) UNRELEASED; urgency=medium
   * d/control: Align (build-)depends with upstream.
   * d/p/fix-test-shell.patch: Dropped. Fixed in new upstream release.
   * d/p/fix-has-expired-tests.patch: Rebased.
+  * d/p/skip-tests.patch: Added to skip tests that are failing upstream.
 
  -- Corey Bryant <corey.bryant@canonical.com>  Wed, 23 Sep 2015 15:40:13 -0400
 
