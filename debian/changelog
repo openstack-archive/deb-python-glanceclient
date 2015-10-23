@@ -1,3 +1,9 @@
+python-glanceclient (1:1.1.0-3) unstable; urgency=medium
+
+  * Added missing breaks+replaces to allow upgrades (Closes: #802097).
+
+ -- Thomas Goirand <zigo@debian.org>  Fri, 23 Oct 2015 07:41:17 +0000
+
 python-glanceclient (1:1.1.0-2) unstable; urgency=medium
 
   * Uploading to unstable.

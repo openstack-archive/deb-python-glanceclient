@@ -115,6 +115,8 @@ Section: doc
 Architecture: all
 Depends: ${misc:Depends},
          ${sphinxdoc:Depends},
+Breaks: python-glanceclient (<< 1:1.1.0-2)
+Replaces: python-glanceclient (<< 1:1.1.0-2)
 Description: Client library for Openstack glance server - doc
  The Glance project provides services for discovering, registering, and
  retrieving virtual machine images over the cloud. They may be stand-alone
