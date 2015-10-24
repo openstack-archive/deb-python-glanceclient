@@ -22,6 +22,9 @@ override_dh_auto_install:
 	mv $(CURDIR)/debian/python-glanceclient/usr/bin/glance $(CURDIR)/debian/python-glanceclient/usr/bin/python2-glance
 	mv $(CURDIR)/debian/python3-glanceclient/usr/bin/glance $(CURDIR)/debian/python3-glanceclient/usr/bin/python3-glance
 
+override_dh_python3:
+	dh_python3 --shebang=/usr/bin/python3
+
 override_dh_auto_clean:
 	dh_auto_clean -O--buildsystem=python_distutils
 	rm -rf .testrepository build doc/man
