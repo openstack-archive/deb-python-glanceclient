@@ -1,6 +1,7 @@
 python-glanceclient (1:1.1.0-4) unstable; urgency=medium
 
   * override_dh_python3 to fix Py3 shebang.
+  * Fixed doubled-defined python-mox3 b-d.
 
  -- Thomas Goirand <zigo@debian.org>  Sat, 24 Oct 2015 00:01:23 +0000
 
