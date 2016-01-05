@@ -205,15 +205,11 @@ class Controller(object):
 
         :param image_id: ID of the image to upload data for.
         :param image_data: File-like object supplying the data to upload.
-        :param image_size: Total size in bytes of image to be uploaded.
+        :param image_size: Unused - present for backwards compatability
         """
         url = '/v2/images/%s/file' % image_id
         hdrs = {'Content-Type': 'application/octet-stream'}
-        if image_size:
-            body = {'image_data': image_data,
-                    'image_size': image_size}
-        else:
-            body = image_data
+        body = image_data
         self.http_client.put(url, headers=hdrs, data=body)
 
     def delete(self, image_id):
@@ -230,13 +226,23 @@ class Controller(object):
             try:
                 setattr(image, key, value)
             except warlock.InvalidOperation as e:
-                raise TypeError(utils.exception_to_str(e))
+                raise TypeError(encodeutils.exception_to_unicode(e))
 
         resp, body = self.http_client.post(url, data=image)
         # NOTE(esheffield): remove 'self' for now until we have an elegant
         # way to pass it into the model constructor without conflict
         body.pop('self', None)
         return self.model(**body)
+
+    def deactivate(self, image_id):
+        """Deactivate an image."""
+        url = '/v2/images/%s/actions/deactivate' % image_id
+        return self.http_client.post(url)
+
+    def reactivate(self, image_id):
+        """Reactivate an image."""
+        url = '/v2/images/%s/actions/reactivate' % image_id
+        return self.http_client.post(url)
 
     def update(self, image_id, remove_props=None, **kwargs):
         """Update attributes of an image.
@@ -250,7 +256,7 @@ class Controller(object):
             try:
                 setattr(image, key, value)
             except warlock.InvalidOperation as e:
-                raise TypeError(utils.exception_to_str(e))
+                raise TypeError(encodeutils.exception_to_unicode(e))
 
         if remove_props:
             cur_props = image.keys()

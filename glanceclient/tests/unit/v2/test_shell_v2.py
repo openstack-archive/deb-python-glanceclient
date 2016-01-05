@@ -13,6 +13,7 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+import argparse
 import json
 import mock
 import os
@@ -106,13 +107,15 @@ class ShellV2Test(testtools.TestCase):
         utils.print_dict = mock.Mock()
         utils.save_image = mock.Mock()
 
-    def assert_exits_with_msg(self, func, func_args, err_msg):
+    def assert_exits_with_msg(self, func, func_args, err_msg=None):
         with mock.patch.object(utils, 'exit') as mocked_utils_exit:
             mocked_utils_exit.return_value = '%s' % err_msg
 
             func(self.gc, func_args)
-
-            mocked_utils_exit.assert_called_once_with(err_msg)
+            if err_msg:
+                mocked_utils_exit.assert_called_once_with(err_msg)
+            else:
+                mocked_utils_exit.assert_called_once_with()
 
     def _run_command(self, cmd):
         self.shell.main(cmd.split())
@@ -401,6 +404,26 @@ class ShellV2Test(testtools.TestCase):
                 pass
 
     @mock.patch('sys.stdin', autospec=True)
+    def test_do_image_create_with_unicode(self, mock_stdin):
+        name = u'\u041f\u0420\u0418\u0412\u0415\u0422\u0418\u041a'
+
+        args = self._make_args({'name': name,
+                                'file': None})
+        with mock.patch.object(self.gc.images, 'create') as mocked_create:
+            ignore_fields = ['self', 'access', 'file', 'schema']
+            expect_image = dict((field, field) for field in ignore_fields)
+            expect_image['id'] = 'pass'
+            expect_image['name'] = name
+            mocked_create.return_value = expect_image
+
+            mock_stdin.isatty = lambda: True
+            test_shell.do_image_create(self.gc, args)
+
+            mocked_create.assert_called_once_with(name=name)
+            utils.print_dict.assert_called_once_with({
+                'id': 'pass', 'name': name})
+
+    @mock.patch('sys.stdin', autospec=True)
     def test_do_image_create_with_user_props(self, mock_stdin):
         args = self._make_args({'name': 'IMG-01',
                                 'property': ['myprop=myval'],
@@ -571,25 +594,67 @@ class ShellV2Test(testtools.TestCase):
             mocked_data.assert_called_once_with('IMG-01')
 
     def test_do_image_delete(self):
-        args = self._make_args({'id': 'pass', 'file': 'test'})
+        args = argparse.Namespace(id=['image1', 'image2'])
         with mock.patch.object(self.gc.images, 'delete') as mocked_delete:
             mocked_delete.return_value = 0
 
             test_shell.do_image_delete(self.gc, args)
+            self.assertEqual(2, mocked_delete.call_count)
 
-            mocked_delete.assert_called_once_with('pass')
+    def test_do_image_deactivate(self):
+        args = argparse.Namespace(id='image1')
+        with mock.patch.object(self.gc.images,
+                               'deactivate') as mocked_deactivate:
+            mocked_deactivate.return_value = 0
+
+            test_shell.do_image_deactivate(self.gc, args)
+            self.assertEqual(1, mocked_deactivate.call_count)
+
+    def test_do_image_reactivate(self):
+        args = argparse.Namespace(id='image1')
+        with mock.patch.object(self.gc.images,
+                               'reactivate') as mocked_reactivate:
+            mocked_reactivate.return_value = 0
+
+            test_shell.do_image_reactivate(self.gc, args)
+            self.assertEqual(1, mocked_reactivate.call_count)
+
+    @mock.patch.object(utils, 'exit')
+    @mock.patch.object(utils, 'print_err')
+    def test_do_image_delete_with_invalid_ids(self, mocked_print_err,
+                                              mocked_utils_exit):
+        args = argparse.Namespace(id=['image1', 'image2'])
+        with mock.patch.object(self.gc.images, 'delete') as mocked_delete:
+            mocked_delete.side_effect = exc.HTTPNotFound
+
+            test_shell.do_image_delete(self.gc, args)
+
+            self.assertEqual(2, mocked_delete.call_count)
+            self.assertEqual(2, mocked_print_err.call_count)
+            mocked_utils_exit.assert_called_once_with()
+
+    @mock.patch.object(utils, 'exit')
+    @mock.patch.object(utils, 'print_err')
+    def test_do_image_delete_with_forbidden_ids(self, mocked_print_err,
+                                                mocked_utils_exit):
+        args = argparse.Namespace(id=['image1', 'image2'])
+        with mock.patch.object(self.gc.images, 'delete') as mocked_delete:
+            mocked_delete.side_effect = exc.HTTPForbidden
+
+            test_shell.do_image_delete(self.gc, args)
+
+            self.assertEqual(2, mocked_delete.call_count)
+            self.assertEqual(2, mocked_print_err.call_count)
+            mocked_utils_exit.assert_called_once_with()
 
     def test_do_image_delete_deleted(self):
         image_id = 'deleted-img'
-        args = self._make_args({'id': image_id})
-        with mock.patch.object(self.gc.images, 'get') as mocked_get:
-            mocked_get.return_value = self._make_args({'id': image_id,
-                                                       'status': 'deleted'})
+        args = argparse.Namespace(id=[image_id])
+        with mock.patch.object(self.gc.images, 'delete') as mocked_delete:
+            mocked_delete.side_effect = exc.HTTPNotFound
 
-            msg = "No image with an ID of '%s' exists." % image_id
             self.assert_exits_with_msg(func=test_shell.do_image_delete,
-                                       func_args=args,
-                                       err_msg=msg)
+                                       func_args=args)
 
     def test_do_member_list(self):
         args = self._make_args({'image_id': 'IMG-01'})
@@ -706,9 +771,10 @@ class ShellV2Test(testtools.TestCase):
                                 'protected': True})
         with mock.patch.object(self.gc.metadefs_namespace,
                                'create') as mocked_create:
-            expect_namespace = {}
-            expect_namespace['namespace'] = 'MyNamespace'
-            expect_namespace['protected'] = True
+            expect_namespace = {
+                'namespace': 'MyNamespace',
+                'protected': True
+            }
 
             mocked_create.return_value = expect_namespace
 
@@ -721,9 +787,10 @@ class ShellV2Test(testtools.TestCase):
     def test_do_md_namespace_import(self):
         args = self._make_args({'file': 'test'})
 
-        expect_namespace = {}
-        expect_namespace['namespace'] = 'MyNamespace'
-        expect_namespace['protected'] = True
+        expect_namespace = {
+            'namespace': 'MyNamespace',
+            'protected': True
+        }
 
         with mock.patch.object(self.gc.metadefs_namespace,
                                'create') as mocked_create:
@@ -758,9 +825,10 @@ class ShellV2Test(testtools.TestCase):
                                 'protected': True})
         with mock.patch.object(self.gc.metadefs_namespace,
                                'update') as mocked_update:
-            expect_namespace = {}
-            expect_namespace['namespace'] = 'MyNamespace'
-            expect_namespace['protected'] = True
+            expect_namespace = {
+                'namespace': 'MyNamespace',
+                'protected': True
+            }
 
             mocked_update.return_value = expect_namespace
 
@@ -777,8 +845,7 @@ class ShellV2Test(testtools.TestCase):
                                 'resource_type': None})
         with mock.patch.object(self.gc.metadefs_namespace,
                                'get') as mocked_get:
-            expect_namespace = {}
-            expect_namespace['namespace'] = 'MyNamespace'
+            expect_namespace = {'namespace': 'MyNamespace'}
 
             mocked_get.return_value = expect_namespace
 
@@ -793,8 +860,7 @@ class ShellV2Test(testtools.TestCase):
                                 'resource_type': 'RESOURCE'})
         with mock.patch.object(self.gc.metadefs_namespace,
                                'get') as mocked_get:
-            expect_namespace = {}
-            expect_namespace['namespace'] = 'MyNamespace'
+            expect_namespace = {'namespace': 'MyNamespace'}
 
             mocked_get.return_value = expect_namespace
 
@@ -903,10 +969,11 @@ class ShellV2Test(testtools.TestCase):
                                 'prefix': 'PREFIX:'})
         with mock.patch.object(self.gc.metadefs_resource_type,
                                'associate') as mocked_associate:
-            expect_rt = {}
-            expect_rt['namespace'] = 'MyNamespace'
-            expect_rt['name'] = 'MyResourceType'
-            expect_rt['prefix'] = 'PREFIX:'
+            expect_rt = {
+                'namespace': 'MyNamespace',
+                'name': 'MyResourceType',
+                'prefix': 'PREFIX:'
+            }
 
             mocked_associate.return_value = expect_rt
 
@@ -961,10 +1028,11 @@ class ShellV2Test(testtools.TestCase):
                                 'schema': '{}'})
         with mock.patch.object(self.gc.metadefs_property,
                                'create') as mocked_create:
-            expect_property = {}
-            expect_property['namespace'] = 'MyNamespace'
-            expect_property['name'] = 'MyProperty'
-            expect_property['title'] = 'Title'
+            expect_property = {
+                'namespace': 'MyNamespace',
+                'name': 'MyProperty',
+                'title': 'Title'
+            }
 
             mocked_create.return_value = expect_property
 
@@ -991,10 +1059,11 @@ class ShellV2Test(testtools.TestCase):
                                 'schema': '{}'})
         with mock.patch.object(self.gc.metadefs_property,
                                'update') as mocked_update:
-            expect_property = {}
-            expect_property['namespace'] = 'MyNamespace'
-            expect_property['name'] = 'MyProperty'
-            expect_property['title'] = 'Title'
+            expect_property = {
+                'namespace': 'MyNamespace',
+                'name': 'MyProperty',
+                'title': 'Title'
+            }
 
             mocked_update.return_value = expect_property
 
@@ -1019,10 +1088,11 @@ class ShellV2Test(testtools.TestCase):
                                 'property': 'MyProperty',
                                 'max_column_width': 80})
         with mock.patch.object(self.gc.metadefs_property, 'get') as mocked_get:
-            expect_property = {}
-            expect_property['namespace'] = 'MyNamespace'
-            expect_property['property'] = 'MyProperty'
-            expect_property['title'] = 'Title'
+            expect_property = {
+                'namespace': 'MyNamespace',
+                'property': 'MyProperty',
+                'title': 'Title'
+            }
 
             mocked_get.return_value = expect_property
 
@@ -1070,9 +1140,10 @@ class ShellV2Test(testtools.TestCase):
                                 'schema': '{}'})
         with mock.patch.object(self.gc.metadefs_object,
                                'create') as mocked_create:
-            expect_object = {}
-            expect_object['namespace'] = 'MyNamespace'
-            expect_object['name'] = 'MyObject'
+            expect_object = {
+                'namespace': 'MyNamespace',
+                'name': 'MyObject'
+            }
 
             mocked_create.return_value = expect_object
 
@@ -1096,9 +1167,10 @@ class ShellV2Test(testtools.TestCase):
                                 'schema': '{}'})
         with mock.patch.object(self.gc.metadefs_object,
                                'update') as mocked_update:
-            expect_object = {}
-            expect_object['namespace'] = 'MyNamespace'
-            expect_object['name'] = 'MyObject'
+            expect_object = {
+                'namespace': 'MyNamespace',
+                'name': 'MyObject'
+            }
 
             mocked_update.return_value = expect_object
 
@@ -1121,9 +1193,10 @@ class ShellV2Test(testtools.TestCase):
                                 'object': 'MyObject',
                                 'max_column_width': 80})
         with mock.patch.object(self.gc.metadefs_object, 'get') as mocked_get:
-            expect_object = {}
-            expect_object['namespace'] = 'MyNamespace'
-            expect_object['object'] = 'MyObject'
+            expect_object = {
+                'namespace': 'MyNamespace',
+                'object': 'MyObject'
+            }
 
             mocked_get.return_value = expect_object
 
@@ -1205,9 +1278,10 @@ class ShellV2Test(testtools.TestCase):
                                 'name': 'MyTag'})
         with mock.patch.object(self.gc.metadefs_tag,
                                'create') as mocked_create:
-            expect_tag = {}
-            expect_tag['namespace'] = 'MyNamespace'
-            expect_tag['name'] = 'MyTag'
+            expect_tag = {
+                'namespace': 'MyNamespace',
+                'name': 'MyTag'
+            }
 
             mocked_create.return_value = expect_tag
 
@@ -1222,9 +1296,10 @@ class ShellV2Test(testtools.TestCase):
                                 'name': 'NewTag'})
         with mock.patch.object(self.gc.metadefs_tag,
                                'update') as mocked_update:
-            expect_tag = {}
-            expect_tag['namespace'] = 'MyNamespace'
-            expect_tag['name'] = 'NewTag'
+            expect_tag = {
+                'namespace': 'MyNamespace',
+                'name': 'NewTag'
+            }
 
             mocked_update.return_value = expect_tag
 
@@ -1239,9 +1314,10 @@ class ShellV2Test(testtools.TestCase):
                                 'tag': 'MyTag',
                                 'sort_dir': 'desc'})
         with mock.patch.object(self.gc.metadefs_tag, 'get') as mocked_get:
-            expect_tag = {}
-            expect_tag['namespace'] = 'MyNamespace'
-            expect_tag['tag'] = 'MyTag'
+            expect_tag = {
+                'namespace': 'MyNamespace',
+                'tag': 'MyTag'
+            }
 
             mocked_get.return_value = expect_tag
 

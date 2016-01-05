@@ -33,6 +33,7 @@ class TestUtils(testtools.TestCase):
         self.assertEqual("1MB", utils.make_size_human_readable(1048576))
         self.assertEqual("1.4GB", utils.make_size_human_readable(1476395008))
         self.assertEqual("9.3MB", utils.make_size_human_readable(9761280))
+        self.assertEqual("0B", utils.make_size_human_readable(None))
 
     def test_get_new_file_size(self):
         size = 98304
@@ -103,24 +104,6 @@ class TestUtils(testtools.TestCase):
 +----------+--------------------------------------------------------------+
 ''',
                          output_dict.getvalue())
-
-    def test_exception_to_str(self):
-        class FakeException(Exception):
-            def __str__(self):
-                raise UnicodeError()
-
-        ret = utils.exception_to_str(Exception('error message'))
-        self.assertEqual('error message', ret)
-
-        ret = utils.exception_to_str(Exception('\xa5 error message'))
-        if six.PY2:
-            self.assertEqual(' error message', ret)
-        else:
-            self.assertEqual('\xa5 error message', ret)
-
-        ret = utils.exception_to_str(FakeException('\xa5 error message'))
-        self.assertEqual("Caught '%(exception)s' exception." %
-                         {'exception': 'FakeException'}, ret)
 
     def test_schema_args_with_list_types(self):
         # NOTE(flaper87): Regression for bug

@@ -17,6 +17,7 @@ from glanceclient.common import http
 from glanceclient.common import utils
 from glanceclient.v1 import image_members
 from glanceclient.v1 import images
+from glanceclient.v1 import versions
 
 
 class Client(object):
@@ -27,6 +28,8 @@ class Client(object):
     :param string token: Token for authentication.
     :param integer timeout: Allows customization of the timeout for client
                             http requests. (optional)
+    :param string language_header: Set Accept-Language header to be sent in
+                                   requests to glance.
     """
 
     def __init__(self, endpoint=None, **kwargs):
@@ -35,3 +38,4 @@ class Client(object):
         self.http_client = http.get_http_client(endpoint=endpoint, **kwargs)
         self.images = images.ImageManager(self.http_client)
         self.image_members = image_members.ImageMemberManager(self.http_client)
+        self.versions = versions.VersionManager(self.http_client)

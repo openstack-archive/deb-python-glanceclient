@@ -16,10 +16,12 @@
 from __future__ import print_function
 
 import errno
+import functools
 import hashlib
 import json
 import os
 import re
+import six.moves.urllib.parse as urlparse
 import sys
 import threading
 import uuid
@@ -36,10 +38,9 @@ from oslo_utils import encodeutils
 from oslo_utils import strutils
 import prettytable
 
-from glanceclient import _i18n
+from glanceclient._i18n import _
 from glanceclient import exc
 
-_ = _i18n._
 
 _memoized_property_lock = threading.Lock()
 
@@ -77,6 +78,7 @@ def on_data_require_fields(data_fields, required=REQUIRED_FIELDS_ON_DATA):
             args = ('--' + x.replace('_', '-') for x in fields)
             return ', '.join(args)
 
+        @functools.wraps(func)
         def func_wrapper(gc, args):
             # Set of arguments with data
             fields = set(a[0] for a in vars(args).items() if a[1])
@@ -285,6 +287,10 @@ def exit(msg='', exit_code=1):
     sys.exit(exit_code)
 
 
+def print_err(msg):
+    print(encodeutils.safe_decode(msg), file=sys.stderr)
+
+
 def save_image(data, path):
     """Save an image to the specified path.
 
@@ -306,8 +312,10 @@ def save_image(data, path):
 def make_size_human_readable(size):
     suffix = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB']
     base = 1024.0
-
     index = 0
+
+    if size is None:
+        size = 0
     while size >= base:
         index = index + 1
         size = size / base
@@ -316,18 +324,6 @@ def make_size_human_readable(size):
     stripped = padded.rstrip('0').rstrip('.')
 
     return '%s%s' % (stripped, suffix[index])
-
-
-def exception_to_str(exc):
-    try:
-        error = six.text_type(exc)
-    except UnicodeError:
-        try:
-            error = str(exc)
-        except UnicodeError:
-            error = ("Caught '%(exception)s' exception." %
-                     {"exception": exc.__class__.__name__})
-    return encodeutils.safe_decode(error, errors='ignore')
 
 
 def get_file_size(file_obj):
@@ -396,11 +392,13 @@ def strip_version(endpoint):
     version = None
     # Get rid of trailing '/' if present
     endpoint = endpoint.rstrip('/')
-    url_bits = endpoint.split('/')
+    url_parts = urlparse.urlparse(endpoint)
+    (scheme, netloc, path, __, __, __) = url_parts
+    path = path.lstrip('/')
     # regex to match 'v1' or 'v2.0' etc
-    if re.match('v\d+\.?\d*', url_bits[-1]):
-        version = float(url_bits[-1].lstrip('v'))
-        endpoint = '/'.join(url_bits[:-1])
+    if re.match('v\d+\.?\d*', path):
+        version = float(path.lstrip('v'))
+        endpoint = scheme + '://' + netloc
     return endpoint, version
 
 

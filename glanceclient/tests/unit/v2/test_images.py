@@ -207,6 +207,12 @@ data_fixtures = {
             'CCC',
         ),
     },
+    '/v2/images/87b634c1-f893-33c9-28a9-e5673c99239a/actions/reactivate': {
+        'POST': ({}, None)
+    },
+    '/v2/images/87b634c1-f893-33c9-28a9-e5673c99239a/actions/deactivate': {
+        'POST': ({}, None)
+    },
     '/v2/images?limit=%d&visibility=public' % images.DEFAULT_PAGE_SIZE: {
         'GET': (
             {},
@@ -789,6 +795,24 @@ class TestController(testtools.TestCase):
                 None)]
         self.assertEqual(expect, self.api.calls)
 
+    def test_deactivate_image(self):
+        id_image = '87b634c1-f893-33c9-28a9-e5673c99239a'
+        self.controller.deactivate(id_image)
+        expect = [('POST',
+                   '/v2/images/%s/actions/deactivate' % id_image,
+                   {},
+                   None)]
+        self.assertEqual(expect, self.api.calls)
+
+    def reactivate_image(self):
+        id_image = '87b634c1-f893-33c9-28a9-e5673c99239a'
+        self.controller.reactivate(id_image)
+        expect = [('POST',
+                   '/v2/images/%s/actions/reactivate' % id_image,
+                   {},
+                   None)]
+        self.assertEqual(expect, self.api.calls)
+
     def test_data_upload(self):
         image_data = 'CCC'
         image_id = '606b0e88-7c5a-4d54-b5bb-046105d4de6f'
@@ -802,11 +826,9 @@ class TestController(testtools.TestCase):
         image_data = 'CCC'
         image_id = '606b0e88-7c5a-4d54-b5bb-046105d4de6f'
         self.controller.upload(image_id, image_data, image_size=3)
-        body = {'image_data': image_data,
-                'image_size': 3}
         expect = [('PUT', '/v2/images/%s/file' % image_id,
                   {'Content-Type': 'application/octet-stream'},
-                  sorted(body.items()))]
+                  image_data)]
         self.assertEqual(expect, self.api.calls)
 
     def test_data_without_checksum(self):

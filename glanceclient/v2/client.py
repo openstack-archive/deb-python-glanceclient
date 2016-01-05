@@ -22,6 +22,7 @@ from glanceclient.v2 import images
 from glanceclient.v2 import metadefs
 from glanceclient.v2 import schemas
 from glanceclient.v2 import tasks
+from glanceclient.v2 import versions
 
 
 class Client(object):
@@ -32,6 +33,8 @@ class Client(object):
     :param string token: Token for authentication.
     :param integer timeout: Allows customization of the timeout for client
                             http requests. (optional)
+    :param string language_header: Set Accept-Language header to be sent in
+                                   requests to glance.
     """
 
     def __init__(self, endpoint=None, **kwargs):
@@ -61,3 +64,5 @@ class Client(object):
 
         self.metadefs_namespace = (
             metadefs.NamespaceController(self.http_client, self.schemas))
+
+        self.versions = versions.VersionController(self.http_client)

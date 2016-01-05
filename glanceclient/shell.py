@@ -34,7 +34,7 @@ from oslo_utils import importutils
 import six.moves.urllib.parse as urlparse
 
 import glanceclient
-from glanceclient import _i18n
+from glanceclient._i18n import _
 from glanceclient.common import utils
 from glanceclient import exc
 
@@ -45,7 +45,6 @@ from keystoneclient.openstack.common.apiclient import exceptions as ks_exc
 from keystoneclient import session
 
 osprofiler_profiler = importutils.try_import("osprofiler.profiler")
-_ = _i18n._
 
 SUPPORTED_VERSIONS = [1, 2]
 
@@ -53,101 +52,21 @@ SUPPORTED_VERSIONS = [1, 2]
 class OpenStackImagesShell(object):
 
     def _append_global_identity_args(self, parser):
-        # FIXME(bobt): these are global identity (Keystone) arguments which
-        # should be consistent and shared by all service clients. Therefore,
-        # they should be provided by python-keystoneclient. We will need to
-        # refactor this code once this functionality is avaible in
-        # python-keystoneclient. See
-        #
-        # https://bugs.launchpad.net/python-keystoneclient/+bug/1332337
-        #
-        parser.add_argument('-k', '--insecure',
-                            default=False,
-                            action='store_true',
-                            help='Explicitly allow glanceclient to perform '
-                            '\"insecure SSL\" (https) requests. The server\'s '
-                            'certificate will not be verified against any '
-                            'certificate authorities. This option should '
-                            'be used with caution.')
-
-        parser.add_argument('--os-cert',
-                            help='Path of certificate file to use in SSL '
-                            'connection. This file can optionally be '
-                            'prepended with the private key.')
-
-        parser.add_argument('--cert-file',
-                            dest='os_cert',
-                            help='DEPRECATED! Use --os-cert.')
-
-        parser.add_argument('--os-key',
-                            help='Path of client key to use in SSL '
-                            'connection. This option is not necessary '
-                            'if your key is prepended to your cert file.')
+        # register common identity args
+        session.Session.register_cli_options(parser)
+        v3_auth.Password.register_argparse_arguments(parser)
 
         parser.add_argument('--key-file',
                             dest='os_key',
                             help='DEPRECATED! Use --os-key.')
 
-        parser.add_argument('--os-cacert',
-                            metavar='<ca-certificate-file>',
-                            dest='os_cacert',
-                            default=utils.env('OS_CACERT'),
-                            help='Path of CA TLS certificate(s) used to '
-                            'verify the remote server\'s certificate. '
-                            'Without this option glance looks for the '
-                            'default system CA certificates.')
-
         parser.add_argument('--ca-file',
                             dest='os_cacert',
                             help='DEPRECATED! Use --os-cacert.')
 
-        parser.add_argument('--os-username',
-                            default=utils.env('OS_USERNAME'),
-                            help='Defaults to env[OS_USERNAME].')
-
-        parser.add_argument('--os_username',
-                            help=argparse.SUPPRESS)
-
-        parser.add_argument('--os-user-id',
-                            default=utils.env('OS_USER_ID'),
-                            help='Defaults to env[OS_USER_ID].')
-
-        parser.add_argument('--os-user-domain-id',
-                            default=utils.env('OS_USER_DOMAIN_ID'),
-                            help='Defaults to env[OS_USER_DOMAIN_ID].')
-
-        parser.add_argument('--os-user-domain-name',
-                            default=utils.env('OS_USER_DOMAIN_NAME'),
-                            help='Defaults to env[OS_USER_DOMAIN_NAME].')
-
-        parser.add_argument('--os-project-id',
-                            default=utils.env('OS_PROJECT_ID'),
-                            help='Another way to specify tenant ID. '
-                                 'This option is mutually exclusive with '
-                                 ' --os-tenant-id. '
-                                 'Defaults to env[OS_PROJECT_ID].')
-
-        parser.add_argument('--os-project-name',
-                            default=utils.env('OS_PROJECT_NAME'),
-                            help='Another way to specify tenant name. '
-                                 'This option is mutually exclusive with '
-                                 ' --os-tenant-name. '
-                                 'Defaults to env[OS_PROJECT_NAME].')
-
-        parser.add_argument('--os-project-domain-id',
-                            default=utils.env('OS_PROJECT_DOMAIN_ID'),
-                            help='Defaults to env[OS_PROJECT_DOMAIN_ID].')
-
-        parser.add_argument('--os-project-domain-name',
-                            default=utils.env('OS_PROJECT_DOMAIN_NAME'),
-                            help='Defaults to env[OS_PROJECT_DOMAIN_NAME].')
-
-        parser.add_argument('--os-password',
-                            default=utils.env('OS_PASSWORD'),
-                            help='Defaults to env[OS_PASSWORD].')
-
-        parser.add_argument('--os_password',
-                            help=argparse.SUPPRESS)
+        parser.add_argument('--cert-file',
+                            dest='os_cert',
+                            help='DEPRECATED! Use --os-cert.')
 
         parser.add_argument('--os-tenant-id',
                             default=utils.env('OS_TENANT_ID'),
@@ -161,13 +80,6 @@ class OpenStackImagesShell(object):
                             help='Defaults to env[OS_TENANT_NAME].')
 
         parser.add_argument('--os_tenant_name',
-                            help=argparse.SUPPRESS)
-
-        parser.add_argument('--os-auth-url',
-                            default=utils.env('OS_AUTH_URL'),
-                            help='Defaults to env[OS_AUTH_URL].')
-
-        parser.add_argument('--os_auth_url',
                             help=argparse.SUPPRESS)
 
         parser.add_argument('--os-region-name',
@@ -225,7 +137,7 @@ class OpenStackImagesShell(object):
 
         parser.add_argument('-v', '--verbose',
                             default=False, action="store_true",
-                            help="Print more verbose output")
+                            help="Print more verbose output.")
 
         parser.add_argument('--get-schema',
                             default=False, action="store_true",
@@ -233,10 +145,6 @@ class OpenStackImagesShell(object):
                             help='Ignores cached copy and forces retrieval '
                                  'of schema that generates portions of the '
                                  'help text. Ignored with API version 1.')
-
-        parser.add_argument('--timeout',
-                            default=600,
-                            help='Number of seconds to wait for a response')
 
         parser.add_argument('--no-ssl-compression',
                             dest='ssl_compression',
@@ -286,7 +194,6 @@ class OpenStackImagesShell(object):
                                 'the profiling will not be triggered even '
                                 'if osprofiler is enabled on server side.')
 
-        # FIXME(bobt): this method should come from python-keystoneclient
         self._append_global_identity_args(parser)
 
         return parser
@@ -443,18 +350,13 @@ class OpenStackImagesShell(object):
         return ks_session
 
     def _get_endpoint_and_token(self, args):
-        image_url = self._get_image_url(args)
+        endpoint = self._get_image_url(args)
         auth_token = args.os_auth_token
 
-        auth_reqd = (not (auth_token and image_url) or
-                     (hasattr(args, 'func') and
-                      utils.is_authentication_required(args.func)))
+        auth_req = (hasattr(args, 'func') and
+                    utils.is_authentication_required(args.func))
 
-        if not auth_reqd:
-            endpoint = image_url
-            token = args.os_auth_token
-        else:
-
+        if auth_req and not (endpoint and auth_token):
             if not args.os_username:
                 raise exc.CommandError(
                     _("You must provide a username via"
@@ -527,7 +429,7 @@ class OpenStackImagesShell(object):
                 'key': args.os_key
             }
             ks_session = self._get_keystone_session(**kwargs)
-            token = args.os_auth_token or ks_session.get_token()
+            auth_token = args.os_auth_token or ks_session.get_token()
 
             endpoint_type = args.os_endpoint_type or 'public'
             service_type = args.os_service_type or 'image'
@@ -536,7 +438,7 @@ class OpenStackImagesShell(object):
                 interface=endpoint_type,
                 region_name=args.os_region_name)
 
-        return endpoint, token
+        return endpoint, auth_token
 
     def _get_versioned_client(self, api_version, args):
         endpoint, token = self._get_endpoint_and_token(args)
@@ -580,6 +482,9 @@ class OpenStackImagesShell(object):
                     schema = client.schemas.get(resource)
                     with open(schema_file_path, 'w') as f:
                         f.write(json.dumps(schema.raw()))
+                except exc.Unauthorized:
+                    raise exc.CommandError(
+                        "Invalid OpenStack Identity credentials.")
                 except Exception:
                     # NOTE(esheffield) do nothing here, we'll get a message
                     # later if the schema is missing
@@ -656,7 +561,7 @@ class OpenStackImagesShell(object):
 
         if not options.os_image_api_version and api_version == 2:
             switch_version = True
-            client = self._get_versioned_client('2', options)
+            client = self._get_versioned_client('2', args)
 
             resp, body = client.http_client.get('/versions')
 
@@ -761,8 +666,9 @@ class HelpFormatter(argparse.HelpFormatter):
 
 def main():
     try:
-        OpenStackImagesShell().main(map(encodeutils.safe_decode, sys.argv[1:]))
+        argv = [encodeutils.safe_decode(a) for a in sys.argv[1:]]
+        OpenStackImagesShell().main(argv)
     except KeyboardInterrupt:
         utils.exit('... terminating glance client', exit_code=130)
     except Exception as e:
-        utils.exit(utils.exception_to_str(e))
+        utils.exit(encodeutils.exception_to_unicode(e))
