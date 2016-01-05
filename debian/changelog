@@ -1,3 +1,9 @@
+python-glanceclient (1:1.2.0-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+
+ -- David Della Vecchia <ddv@canonical.com>  Tue, 05 Jan 2016 18:48:23 -0500
+
 python-glanceclient (1:1.1.0-4) unstable; urgency=medium
 
   * override_dh_python3 to fix Py3 shebang.
