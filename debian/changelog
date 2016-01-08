@@ -1,10 +1,14 @@
 python-glanceclient (1:1.2.0-1) UNRELEASED; urgency=medium
 
+  [ David Della Vecchia ]
   * New upstream release.
   * d/control: Align requirements with upstream.
   * d/gbp.conf: Update gbp configuration for mitaka branch.
 
- -- David Della Vecchia <ddv@canonical.com>  Tue, 05 Jan 2016 18:48:23 -0500
+  [ Corey Bryant ]
+  * d/rules: Run tests for all py3 versions.
+
+ -- Corey Bryant <corey.bryant@canonical.com>  Fri, 08 Jan 2016 15:15:21 -0500
 
 python-glanceclient (1:1.1.0-4) unstable; urgency=medium
 
