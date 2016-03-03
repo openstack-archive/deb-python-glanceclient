@@ -1,4 +1,4 @@
-python-glanceclient (1:1.2.0-2) UNRELEASED; urgency=medium
+python-glanceclient (1:1.2.0-2) experimental; urgency=medium
 
   [ Corey Bryant ]
   * d/p/skip-tests-2.patch: Added to skip tests that are failing upstream.
@@ -6,7 +6,10 @@ python-glanceclient (1:1.2.0-2) UNRELEASED; urgency=medium
   [ Ondřej Nový ]
   * Fixed VCS URLs (https).
 
- -- Corey Bryant <corey.bryant@canonical.com>  Sat, 16 Jan 2016 11:37:36 -0500
+  [ Thomas Goirand ]
+  * Standards-Version: 3.9.7 (no change).
+
+ -- Thomas Goirand <zigo@debian.org>  Thu, 03 Mar 2016 03:31:58 +0000
 
 python-glanceclient (1:1.2.0-1) experimental; urgency=medium
 
