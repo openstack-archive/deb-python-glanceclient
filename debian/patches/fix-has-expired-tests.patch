@@ -8,12 +8,12 @@ Last-Update: 2015-06-08
 
 --- a/glanceclient/tests/unit/test_ssl.py
 +++ b/glanceclient/tests/unit/test_ssl.py
-@@ -232,7 +232,7 @@
-                     six.PY3 and 'No such file' not in e.message):
+@@ -209,7 +209,7 @@
+             if ('PEM lib' not in e.message):
                  self.fail('No appropriate failure message is received')
          except Exception as e:
 -            self.fail('Unexpected exception has been raised')
 +            self.skipTest('Skipped by Debian')
  
      @mock.patch('sys.stderr')
-     def test_v2_requests_bad_ca(self, __):
+     def test_v2_requests_bad_cert(self, __):
