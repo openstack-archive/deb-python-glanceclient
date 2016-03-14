@@ -40,7 +40,8 @@ def schema_args(schema_getter, omit=None):
     my_schema_getter = lambda: {
         'properties': {
             'container_format': {
-                'enum': [None, 'ami', 'ari', 'aki', 'bare', 'ovf', 'ova'],
+                'enum': [None, 'ami', 'ari', 'aki', 'bare', 'ovf', 'ova',
+                         'docker'],
                 'type': 'string',
                 'description': 'Format of the container'},
             'disk_format': {
@@ -122,23 +123,19 @@ class ShellV2Test(testtools.TestCase):
 
     @mock.patch('sys.stderr')
     def test_image_create_missing_disk_format(self, __):
-        # We test for all possible sources
-        for origin in ('--file', '--location', '--copy-from'):
-            e = self.assertRaises(exc.CommandError, self._run_command,
-                                  '--os-image-api-version 2 image-create ' +
-                                  origin + ' fake_src --container-format bare')
-            self.assertEqual('error: Must provide --disk-format when using '
-                             + origin + '.', e.message)
+        e = self.assertRaises(exc.CommandError, self._run_command,
+                              '--os-image-api-version 2 image-create ' +
+                              '--file fake_src --container-format bare')
+        self.assertEqual('error: Must provide --disk-format when using '
+                         '--file.', e.message)
 
     @mock.patch('sys.stderr')
     def test_image_create_missing_container_format(self, __):
-        # We test for all possible sources
-        for origin in ('--file', '--location', '--copy-from'):
-            e = self.assertRaises(exc.CommandError, self._run_command,
-                                  '--os-image-api-version 2 image-create ' +
-                                  origin + ' fake_src --disk-format qcow2')
-            self.assertEqual('error: Must provide --container-format when '
-                             'using ' + origin + '.', e.message)
+        e = self.assertRaises(exc.CommandError, self._run_command,
+                              '--os-image-api-version 2 image-create ' +
+                              '--file fake_src --disk-format qcow2')
+        self.assertEqual('error: Must provide --container-format when '
+                         'using --file.', e.message)
 
     @mock.patch('sys.stderr')
     def test_image_create_missing_container_format_stdin_data(self, __):
@@ -655,6 +652,36 @@ class ShellV2Test(testtools.TestCase):
 
             self.assert_exits_with_msg(func=test_shell.do_image_delete,
                                        func_args=args)
+
+    @mock.patch.object(utils, 'print_err')
+    def test_do_image_download_with_forbidden_id(self, mocked_print_err):
+        args = self._make_args({'id': 'IMG-01', 'file': None,
+                                'progress': False})
+        with mock.patch.object(self.gc.images, 'data') as mocked_data:
+            mocked_data.side_effect = exc.HTTPForbidden
+            try:
+                test_shell.do_image_download(self.gc, args)
+                self.fail('Exit not called')
+            except SystemExit:
+                pass
+
+            self.assertEqual(1, mocked_data.call_count)
+            self.assertEqual(1, mocked_print_err.call_count)
+
+    @mock.patch.object(utils, 'print_err')
+    def test_do_image_download_with_500(self, mocked_print_err):
+        args = self._make_args({'id': 'IMG-01', 'file': None,
+                                'progress': False})
+        with mock.patch.object(self.gc.images, 'data') as mocked_data:
+            mocked_data.side_effect = exc.HTTPInternalServerError
+            try:
+                test_shell.do_image_download(self.gc, args)
+                self.fail('Exit not called')
+            except SystemExit:
+                pass
+
+            self.assertEqual(1, mocked_data.call_count)
+            self.assertEqual(1, mocked_print_err.call_count)
 
     def test_do_member_list(self):
         args = self._make_args({'image_id': 'IMG-01'})

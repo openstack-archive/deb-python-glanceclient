@@ -14,8 +14,8 @@
 #    under the License.
 
 import json
-
 from oslo_utils import encodeutils
+from requests import codes
 import six
 from six.moves.urllib import parse
 import warlock
@@ -182,16 +182,20 @@ class Controller(object):
         # NOTE(bcwaldon): remove 'self' for now until we have an elegant
         # way to pass it into the model constructor without conflict
         body.pop('self', None)
-        return self.model(**body)
+        return self.unvalidated_model(**body)
 
     def data(self, image_id, do_checksum=True):
         """Retrieve data of an image.
 
         :param image_id:    ID of the image to download.
         :param do_checksum: Enable/disable checksum validation.
+        :returns: An iterable body or None
         """
         url = '/v2/images/%s/file' % image_id
         resp, body = self.http_client.get(url)
+        if resp.status_code == codes.no_content:
+            return None
+
         checksum = resp.headers.get('content-md5', None)
         content_length = int(resp.headers.get('content-length', 0))
 
@@ -205,7 +209,7 @@ class Controller(object):
 
         :param image_id: ID of the image to upload data for.
         :param image_data: File-like object supplying the data to upload.
-        :param image_size: Unused - present for backwards compatability
+        :param image_size: Unused - present for backwards compatibility
         """
         url = '/v2/images/%s/file' % image_id
         hdrs = {'Content-Type': 'application/octet-stream'}
@@ -251,7 +255,8 @@ class Controller(object):
         :param remove_props: List of property names to remove
         :param \*\*kwargs: Image attribute names and their new values.
         """
-        image = self.get(image_id)
+        unvalidated_image = self.get(image_id)
+        image = self.model(**unvalidated_image)
         for (key, value) in kwargs.items():
             try:
                 setattr(image, key, value)
@@ -301,12 +306,6 @@ class Controller(object):
         :param metadata: Metadata associated with the location.
         :returns: The updated image
         """
-        image = self._get_image_with_locations_or_fail(image_id)
-        url_list = [l['url'] for l in image.locations]
-        if url in url_list:
-            err_str = 'A location entry at %s already exists' % url
-            raise exc.HTTPConflict(err_str)
-
         add_patch = [{'op': 'add', 'path': '/locations/-',
                       'value': {'url': url, 'metadata': metadata}}]
         self._send_image_update_request(image_id, add_patch)

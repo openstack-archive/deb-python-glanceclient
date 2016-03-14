@@ -47,14 +47,14 @@ def get_image_schema():
 @utils.schema_args(get_image_schema, omit=['created_at', 'updated_at', 'file',
                                            'checksum', 'virtual_size', 'size',
                                            'status', 'schema', 'direct_url',
-                                           'locations'])
+                                           'locations', 'self'])
 @utils.arg('--property', metavar="<key=value>", action='append',
            default=[], help=_('Arbitrary property to associate with image.'
                               ' May be used multiple times.'))
 @utils.arg('--file', metavar='<FILE>',
            help=_('Local file that contains disk image to be uploaded '
-                  'during creation. Must be present if images are not passed '
-                  'to the client via stdin.'))
+                  'during creation. Alternatively, the image data can be '
+                  'passed to the client via stdin.'))
 @utils.arg('--progress', action='store_true', default=False,
            help=_('Show upload progress bar.'))
 @utils.on_data_require_fields(DATA_FIELDS)
@@ -91,7 +91,8 @@ def do_image_create(gc, args):
 @utils.schema_args(get_image_schema, omit=['id', 'locations', 'created_at',
                                            'updated_at', 'file', 'checksum',
                                            'virtual_size', 'size', 'status',
-                                           'schema', 'direct_url', 'tags'])
+                                           'schema', 'direct_url', 'tags',
+                                           'self'])
 @utils.arg('--property', metavar="<key=value>", action='append',
            default=[], help=_('Arbitrary property to associate with image.'
                               ' May be used multiple times.'))
@@ -137,7 +138,8 @@ def do_image_update(gc, args):
            help=_("Filter images by a user-defined tag."))
 @utils.arg('--sort-key', default=[], action='append',
            choices=images.SORT_KEY_VALUES,
-           help=_('Sort image list by specified fields.'))
+           help=_('Sort image list by specified fields.'
+                  ' May be used multiple times.'))
 @utils.arg('--sort-dir', default=[], action='append',
            choices=images.SORT_DIR_VALUES,
            help=_('Sort image list in specified directions.'))
@@ -274,7 +276,16 @@ def do_explain(gc, args):
            help=_('Show download progress bar.'))
 def do_image_download(gc, args):
     """Download a specific image."""
-    body = gc.images.data(args.id)
+    try:
+        body = gc.images.data(args.id)
+    except (exc.HTTPForbidden, exc.HTTPException) as e:
+        msg = "Unable to download image '%s'. (%s)" % (args.id, e)
+        utils.exit(msg)
+
+    if body is None:
+        msg = ('Image %s has no data.' % args.id)
+        utils.exit(msg)
+
     if args.progress:
         body = progressbar.VerboseIteratorWrapper(body, len(body))
     if not (sys.stdout.isatty() and args.file is None):
@@ -382,7 +393,7 @@ def do_image_tag_delete(gc, args):
 @utils.arg('--metadata', metavar='<STRING>', default='{}',
            help=_('Metadata associated with the location. '
                   'Must be a valid JSON object (default: %(default)s)'))
-@utils.arg('id', metavar='<ID>',
+@utils.arg('id', metavar='<IMAGE_ID>',
            help=_('ID of image to which the location is to be added.'))
 def do_location_add(gc, args):
     """Add a location (and related metadata) to an image."""
@@ -397,7 +408,7 @@ def do_location_add(gc, args):
 
 @utils.arg('--url', metavar='<URL>', action='append', required=True,
            help=_('URL of location to remove. May be used multiple times.'))
-@utils.arg('id', metavar='<ID>',
+@utils.arg('id', metavar='<IMAGE_ID>',
            help=_('ID of image whose locations are to be removed.'))
 def do_location_delete(gc, args):
     """Remove locations (and related metadata) from an image."""
@@ -409,7 +420,7 @@ def do_location_delete(gc, args):
 @utils.arg('--metadata', metavar='<STRING>', default='{}',
            help=_('Metadata associated with the location. '
                   'Must be a valid JSON object (default: %(default)s)'))
-@utils.arg('id', metavar='<ID>',
+@utils.arg('id', metavar='<IMAGE_ID>',
            help=_('ID of image whose location is to be updated.'))
 def do_location_update(gc, args):
     """Update metadata of an image's location."""

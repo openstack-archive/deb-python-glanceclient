@@ -22,23 +22,13 @@ from keystoneclient import exceptions as ksc_exc
 from oslo_utils import importutils
 from oslo_utils import netutils
 import requests
-try:
-    ProtocolError = requests.packages.urllib3.exceptions.ProtocolError
-except ImportError:
-    ProtocolError = requests.exceptions.ConnectionError
 import six
-from six.moves.urllib import parse
 import warnings
 
 try:
     import json
 except ImportError:
     import simplejson as json
-
-# Python 2.5 compat fix
-if not hasattr(parse, 'parse_qsl'):
-    import cgi
-    parse.parse_qsl = cgi.parse_qsl
 
 from oslo_utils import encodeutils
 
@@ -135,7 +125,8 @@ class HTTPClient(_BaseHTTPClient):
         self.session.headers["User-Agent"] = USER_AGENT
 
         if self.auth_token:
-            self.session.headers["X-Auth-Token"] = self.auth_token
+            self.session.headers["X-Auth-Token"] = encodeutils.safe_encode(
+                self.auth_token)
 
         if self.language_header:
             self.session.headers["Accept-Language"] = self.language_header
@@ -259,7 +250,7 @@ class HTTPClient(_BaseHTTPClient):
             message = ("Error communicating with %(url)s: %(e)s" %
                        dict(url=conn_url, e=e))
             raise exc.InvalidEndpoint(message=message)
-        except (requests.exceptions.ConnectionError, ProtocolError) as e:
+        except requests.exceptions.ConnectionError as e:
             message = ("Error finding address for %(url)s: %(e)s" %
                        dict(url=conn_url, e=e))
             raise exc.CommunicationError(message=message)

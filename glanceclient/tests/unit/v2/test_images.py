@@ -14,7 +14,7 @@
 #    under the License.
 
 import errno
-
+import mock
 import testtools
 
 from glanceclient import exc
@@ -866,6 +866,21 @@ class TestController(testtools.TestCase):
         body = ''.join([b for b in body])
         self.assertEqual('CCC', body)
 
+    def test_download_no_data(self):
+        resp = utils.FakeResponse(headers={}, status_code=204)
+        self.controller.http_client.get = mock.Mock(return_value=(resp, None))
+        body = self.controller.data('image_id')
+        self.assertIsNone(body)
+
+    def test_download_forbidden(self):
+        self.controller.http_client.get = mock.Mock(
+            side_effect=exc.HTTPForbidden())
+        try:
+            self.controller.data('image_id')
+            self.fail('No forbidden exception raised.')
+        except exc.HTTPForbidden:
+            pass
+
     def test_update_replace_prop(self):
         image_id = '3a4560a1-e585-443e-9b39-553b46ec92d1'
         params = {'name': 'pong'}
@@ -1008,16 +1023,12 @@ class TestController(testtools.TestCase):
 
     def test_location_ops_when_server_disabled_location_ops(self):
         # Location operations should not be allowed if server has not
-        # enabled location related operations
+        # enabled location related operations. There is no need to check it
+        # when do location add, because the check would be done in server side.
         image_id = '3a4560a1-e585-443e-9b39-553b46ec92d1'
         estr = 'The administrator has disabled API access to image locations'
         url = 'http://bar.com/'
         meta = {'bar': 'barmeta'}
-
-        e = self.assertRaises(exc.HTTPBadRequest,
-                              self.controller.add_location,
-                              image_id, url, meta)
-        self.assertIn(estr, str(e))
 
         e = self.assertRaises(exc.HTTPBadRequest,
                               self.controller.delete_locations,
@@ -1046,20 +1057,19 @@ class TestController(testtools.TestCase):
         add_patch = {'path': '/locations/-', 'value': new_loc, 'op': 'add'}
         self.controller.add_location(image_id, **new_loc)
         self.assertEqual(self.api.calls, [
-            self._empty_get(image_id),
             self._patch_req(image_id, [add_patch]),
             self._empty_get(image_id)
         ])
 
-    def test_add_duplicate_location(self):
+    @mock.patch.object(images.Controller, '_send_image_update_request',
+                       side_effect=exc.HTTPBadRequest)
+    def test_add_duplicate_location(self, mock_request):
         image_id = 'a2b83adc-888e-11e3-8872-78acc0b951d8'
         new_loc = {'url': 'http://foo.com/', 'metadata': {'foo': 'newfoo'}}
-        err_str = 'A location entry at %s already exists' % new_loc['url']
 
-        err = self.assertRaises(exc.HTTPConflict,
-                                self.controller.add_location,
-                                image_id, **new_loc)
-        self.assertIn(err_str, str(err))
+        self.assertRaises(exc.HTTPBadRequest,
+                          self.controller.add_location,
+                          image_id, **new_loc)
 
     def test_remove_location(self):
         image_id = 'a2b83adc-888e-11e3-8872-78acc0b951d8'

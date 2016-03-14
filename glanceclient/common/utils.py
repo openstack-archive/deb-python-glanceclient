@@ -283,7 +283,7 @@ def import_versioned_module(version, submodule=None):
 
 def exit(msg='', exit_code=1):
     if msg:
-        print(encodeutils.safe_decode(msg), file=sys.stderr)
+        print_err(msg)
     sys.exit(exit_code)
 
 
@@ -298,7 +298,10 @@ def save_image(data, path):
     :param path: path to save the image to
     """
     if path is None:
-        image = sys.stdout
+        if six.PY3:
+            image = sys.stdout.buffer
+        else:
+            image = sys.stdout
     else:
         image = open(path, 'wb')
     try:
@@ -449,8 +452,7 @@ def memoized_property(fn):
 
 def safe_header(name, value):
     if value is not None and name in SENSITIVE_HEADERS:
-        v = value.encode('utf-8')
-        h = hashlib.sha1(v)
+        h = hashlib.sha1(value)
         d = h.hexdigest()
         return name, "{SHA1}%s" % d
     else:
