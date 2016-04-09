@@ -54,7 +54,7 @@ Build-Depends-Indep: python-babel,
                      python3-os-client-config (>= 1.13.1),
                      subunit,
                      testrepository,
-Standards-Version: 3.9.7
+Standards-Version: 3.9.8
 Vcs-Browser: https://anonscm.debian.org/cgit/openstack/python-glanceclient.git/
 Vcs-Git: https://anonscm.debian.org/git/openstack/python-glanceclient.git
 Homepage: http://glance.openstack.org
