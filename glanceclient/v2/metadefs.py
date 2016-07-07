@@ -102,7 +102,8 @@ class NamespaceController(object):
                        in a subsequent limited request.
         :param sort_key: The field to sort on (for example, 'created_at')
         :param sort_dir: The direction to sort ('asc' or 'desc')
-        :returns generator over list of Namespaces
+        :returns: generator over list of Namespaces
+
         """
 
         ori_validate_fun = self.model.validate
@@ -201,7 +202,7 @@ class ResourceTypeController(object):
         return self.model(**body)
 
     def deassociate(self, namespace, resource):
-        """Deasociate a resource type with a namespace."""
+        """Deassociate a resource type with a namespace."""
         url = '/v2/metadefs/namespaces/{0}/resource_types/{1}'. \
             format(namespace, resource)
         self.http_client.delete(url)
@@ -209,7 +210,7 @@ class ResourceTypeController(object):
     def list(self):
         """Retrieve a listing of available resource types.
 
-        :returns generator over list of resource_types
+        :returns: generator over list of resource_types
         """
 
         url = '/v2/metadefs/resource_types'
@@ -283,7 +284,7 @@ class PropertyController(object):
     def list(self, namespace, **kwargs):
         """Retrieve a listing of metadata properties.
 
-        :returns generator over list of objects
+        :returns: generator over list of objects
         """
         url = '/v2/metadefs/namespaces/{0}/properties'.format(namespace)
 
@@ -336,7 +337,7 @@ class ObjectController(object):
         """Update an object.
 
         :param namespace: Name of a namespace the object belongs.
-        :param prop_name: Name of an object (old one).
+        :param object_name: Name of an object (old one).
         :param kwargs: Unpacked object.
         """
         obj = self.get(namespace, object_name)
@@ -368,7 +369,7 @@ class ObjectController(object):
     def list(self, namespace, **kwargs):
         """Retrieve a listing of metadata objects.
 
-        :returns generator over list of objects
+        :returns: generator over list of objects
         """
         url = '/v2/metadefs/namespaces/{0}/objects'.format(namespace,)
         resp, body = self.http_client.get(url)
@@ -440,7 +441,7 @@ class TagController(object):
         """Update a tag.
 
         :param namespace: Name of a namespace the Tag belongs.
-        :param prop_name: Name of the Tag (old one).
+        :param tag_name: Name of the Tag (old one).
         :param kwargs: Unpacked tag.
         """
         tag = self.get(namespace, tag_name)
@@ -472,7 +473,7 @@ class TagController(object):
     def list(self, namespace, **kwargs):
         """Retrieve a listing of metadata tags.
 
-        :returns generator over list of tags.
+        :returns: generator over list of tags.
         """
         url = '/v2/metadefs/namespaces/{0}/tags'.format(namespace)
         resp, body = self.http_client.get(url)

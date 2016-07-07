@@ -22,6 +22,8 @@ from glanceclient import exc
 from glanceclient.v2 import image_members
 from glanceclient.v2 import image_schema
 from glanceclient.v2 import images
+from glanceclient.v2 import namespace_schema
+from glanceclient.v2 import resource_type_schema
 from glanceclient.v2 import tasks
 import json
 import os
@@ -270,7 +272,7 @@ def do_explain(gc, args):
 @utils.arg('--file', metavar='<FILE>',
            help=_('Local file to save downloaded image data to. '
                   'If this is not specified and there is no redirection '
-                  'the image data will be not be saved.'))
+                  'the image data will not be saved.'))
 @utils.arg('id', metavar='<IMAGE_ID>', help=_('ID of image to download.'))
 @utils.arg('--progress', action='store_true', default=False,
            help=_('Show download progress bar.'))
@@ -336,6 +338,10 @@ def do_image_delete(gc, args):
             failure_flag = True
         except exc.HTTPNotFound:
             msg = "No image with an ID of '%s' exists." % args_id
+            utils.print_err(msg)
+            failure_flag = True
+        except exc.HTTPConflict:
+            msg = "Unable to delete image '%s' because it is in use." % args_id
             utils.print_err(msg)
             failure_flag = True
         except exc.HTTPException as e:
@@ -426,6 +432,10 @@ def do_location_update(gc, args):
     """Update metadata of an image's location."""
     try:
         metadata = json.loads(args.metadata)
+
+        if metadata == {}:
+            print("WARNING -- The location's metadata will be updated to "
+                  "an empty JSON object.")
     except ValueError:
         utils.exit('Metadata is not a valid JSON object.')
     else:
@@ -446,6 +456,8 @@ def get_namespace_schema():
             with open(schema_path, "r") as f:
                 schema_raw = f.read()
                 NAMESPACE_SCHEMA = json.loads(schema_raw)
+        else:
+            return namespace_schema.BASE_SCHEMA
     return NAMESPACE_SCHEMA
 
 
@@ -593,6 +605,8 @@ def get_resource_type_schema():
             with open(schema_path, "r") as f:
                 schema_raw = f.read()
                 RESOURCE_TYPE_SCHEMA = json.loads(schema_raw)
+        else:
+            return resource_type_schema.BASE_SCHEMA
     return RESOURCE_TYPE_SCHEMA
 
 

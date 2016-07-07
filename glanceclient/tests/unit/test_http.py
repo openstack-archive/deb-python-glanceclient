@@ -160,7 +160,7 @@ class TestClient(testtools.TestCase):
         self.assertTrue('Accept-Language' not in headers)
 
     def test_connection_timeout(self):
-        """Should receive an InvalidEndpoint if connection timeout."""
+        """Verify a InvalidEndpoint is received if connection times out."""
         def cb(request, context):
             raise requests.exceptions.Timeout
 
@@ -172,11 +172,9 @@ class TestClient(testtools.TestCase):
         self.assertIn(self.endpoint, comm_err.message)
 
     def test_connection_refused(self):
-        """
+        """Verify a CommunicationError is received if connection is refused.
 
-        Should receive a CommunicationError if connection refused.
-        And the error should list the host and port that refused the
-        connection
+        The error should list the host and port that refused the connection.
         """
         def cb(request, context):
             raise requests.exceptions.ConnectionError()
@@ -200,23 +198,20 @@ class TestClient(testtools.TestCase):
         resp, body = self.client.get(path, headers=headers)
         self.assertEqual(text, resp.text)
 
-    def test_headers_encoding(self):
-        if not hasattr(self.client, 'encode_headers'):
-            self.skipTest('Cannot do header encoding check on SessionClient')
+    def test_request_id(self):
+        path = '/v1/images/detail'
+        self.mock.get(self.endpoint + path,
+                      headers={"x-openstack-request-id": "req-aaa"})
 
+        self.client.get(path)
+        self.assertEqual(self.client.last_request_id, 'req-aaa')
+
+    def test_headers_encoding(self):
         value = u'ni\xf1o'
         headers = {"test": value, "none-val": None}
-        encoded = self.client.encode_headers(headers)
+        encoded = http.encode_headers(headers)
         self.assertEqual(b"ni\xc3\xb1o", encoded[b"test"])
         self.assertNotIn("none-val", encoded)
-
-    def test_auth_token_header_encoding(self):
-        # Tests that X-Auth-Token header is converted to ascii string, as
-        # httplib in python 2.6 won't do the conversion
-        value = u'ni\xf1o'
-        http_client_object = http.HTTPClient(self.endpoint, token=value)
-        self.assertEqual(b'ni\xc3\xb1o',
-                         http_client_object.session.headers['X-Auth-Token'])
 
     def test_raw_request(self):
         """Verify the path being used for HTTP requests reflects accurately."""
@@ -382,3 +377,26 @@ class TestClient(testtools.TestCase):
         self.assertThat(mock_log.call_args[0][0],
                         matchers.Not(matchers.MatchesRegex(token_regex)),
                         'token found in LOG.debug parameter')
+
+    def test_expired_token_has_changed(self):
+        # instantiate client with some token
+        fake_token = b'fake-token'
+        http_client = http.HTTPClient(self.endpoint,
+                                      token=fake_token)
+        path = '/v1/images/my-image'
+        self.mock.get(self.endpoint + path)
+        http_client.get(path)
+        headers = self.mock.last_request.headers
+        self.assertEqual(fake_token, headers['X-Auth-Token'])
+        # refresh the token
+        refreshed_token = b'refreshed-token'
+        http_client.auth_token = refreshed_token
+        http_client.get(path)
+        headers = self.mock.last_request.headers
+        self.assertEqual(refreshed_token, headers['X-Auth-Token'])
+        # regression check for bug 1448080
+        unicode_token = u'ni\xf1o'
+        http_client.auth_token = unicode_token
+        http_client.get(path)
+        headers = self.mock.last_request.headers
+        self.assertEqual(b'ni\xc3\xb1o', headers['X-Auth-Token'])

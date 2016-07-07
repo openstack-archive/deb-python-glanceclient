@@ -42,6 +42,20 @@ USER_AGENT = 'python-glanceclient'
 CHUNKSIZE = 1024 * 64  # 64kB
 
 
+def encode_headers(headers):
+    """Encodes headers.
+
+    Note: This should be used right before
+    sending anything out.
+
+    :param headers: Headers to encode
+    :returns: Dictionary with encoded headers'
+              names and values
+    """
+    return dict((encodeutils.safe_encode(h), encodeutils.safe_encode(v))
+                for h, v in six.iteritems(headers) if v is not None)
+
+
 class _BaseHTTPClient(object):
 
     @staticmethod
@@ -116,6 +130,7 @@ class HTTPClient(_BaseHTTPClient):
         self.identity_headers = kwargs.get('identity_headers')
         self.auth_token = kwargs.get('token')
         self.language_header = kwargs.get('language_header')
+        self.last_request_id = None
         if self.identity_headers:
             if self.identity_headers.get('X-Auth-Token'):
                 self.auth_token = self.identity_headers.get('X-Auth-Token')
@@ -123,10 +138,6 @@ class HTTPClient(_BaseHTTPClient):
 
         self.session = requests.Session()
         self.session.headers["User-Agent"] = USER_AGENT
-
-        if self.auth_token:
-            self.session.headers["X-Auth-Token"] = encodeutils.safe_encode(
-                self.auth_token)
 
         if self.language_header:
             self.session.headers["Accept-Language"] = self.language_header
@@ -197,20 +208,6 @@ class HTTPClient(_BaseHTTPClient):
         LOG.debug('\n'.join([encodeutils.safe_decode(x, errors='ignore')
                              for x in dump]))
 
-    @staticmethod
-    def encode_headers(headers):
-        """Encodes headers.
-
-        Note: This should be used right before
-        sending anything out.
-
-        :param headers: Headers to encode
-        :returns: Dictionary with encoded headers'
-                  names and values
-        """
-        return dict((encodeutils.safe_encode(h), encodeutils.safe_encode(v))
-                    for h, v in six.iteritems(headers) if v is not None)
-
     def _request(self, method, url, **kwargs):
         """Send an http request with the specified characteristics.
 
@@ -226,13 +223,17 @@ class HTTPClient(_BaseHTTPClient):
 
         data = self._set_common_request_kwargs(headers, kwargs)
 
+        # add identity header to the request
+        if not headers.get('X-Auth-Token'):
+            headers['X-Auth-Token'] = self.auth_token
+
         if osprofiler_web:
             headers.update(osprofiler_web.get_trace_id_headers())
 
         # Note(flaper87): Before letting headers / url fly,
         # they should be encoded otherwise httplib will
         # complain.
-        headers = self.encode_headers(headers)
+        headers = encode_headers(headers)
 
         if self.endpoint.endswith("/") or url.startswith("/"):
             conn_url = "%s%s" % (self.endpoint, url)
@@ -264,6 +265,7 @@ class HTTPClient(_BaseHTTPClient):
                        {'endpoint': endpoint, 'e': e})
             raise exc.CommunicationError(message=message)
 
+        self.last_request_id = resp.headers.get('x-openstack-request-id')
         resp, body_iter = self._handle_response(resp)
         self.log_http_response(resp)
         return resp, body_iter
@@ -303,10 +305,11 @@ class SessionClient(adapter.Adapter, _BaseHTTPClient):
     def __init__(self, session, **kwargs):
         kwargs.setdefault('user_agent', USER_AGENT)
         kwargs.setdefault('service_type', 'image')
+        self.last_request_id = None
         super(SessionClient, self).__init__(session, **kwargs)
 
     def request(self, url, method, **kwargs):
-        headers = kwargs.pop('headers', {})
+        headers = encode_headers(kwargs.pop('headers', {}))
         kwargs['raise_exc'] = False
         data = self._set_common_request_kwargs(headers, kwargs)
 
@@ -329,6 +332,7 @@ class SessionClient(adapter.Adapter, _BaseHTTPClient):
                        dict(url=conn_url, e=e))
             raise exc.CommunicationError(message=message)
 
+        self.last_request_id = resp.headers.get('x-openstack-request-id')
         return self._handle_response(resp)
 
 
