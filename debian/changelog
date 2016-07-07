@@ -6,6 +6,7 @@ python-glanceclient (1:2.1.0-1) UNRELEASED; urgency=medium
 
   [ Corey Bryant ]
   * New upstream release.
+  * d/gbp.conf: Update debian-branch for Newton.
 
  -- Corey Bryant <corey.bryant@canonical.com>  Thu, 07 Jul 2016 14:34:16 -0400
 
