@@ -1,26 +1,12 @@
 #!/usr/bin/make -f
 
-PYTHONS:=$(shell pyversions -vr)
-PYTHON3S:=$(shell py3versions -vr)
-
 include /usr/share/openstack-pkg-tools/pkgos.make
-
-export OSLO_PACKAGE_VERSION=$(VERSION)
 
 %:
 	dh $@ --buildsystem=python_distutils --with python2,python3,sphinxdoc
 
 override_dh_auto_install:
-	set -e ; for pyvers in $(PYTHONS); do \
-		python$$pyvers setup.py install --install-layout=deb \
-			--root $(CURDIR)/debian/python-glanceclient; \
-	done
-	set -e ; for pyvers in $(PYTHON3S); do \
-		python$$pyvers setup.py install --install-layout=deb \
-			--root $(CURDIR)/debian/python3-glanceclient; \
-	done
-	mv $(CURDIR)/debian/python-glanceclient/usr/bin/glance $(CURDIR)/debian/python-glanceclient/usr/bin/python2-glance
-	mv $(CURDIR)/debian/python3-glanceclient/usr/bin/glance $(CURDIR)/debian/python3-glanceclient/usr/bin/python3-glance
+	pkgos-dh_auto_install
 
 override_dh_python3:
 	dh_python3 --shebang=/usr/bin/python3
@@ -35,18 +21,7 @@ override_dh_install:
 
 override_dh_auto_test:
 ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
-	@echo "===> Running tests"
-	set -e ; set -x ; for i in 2.7 $(PYTHON3S) ; do \
-		PYMAJOR=`echo $$i | cut -d'.' -f1` ; \
-		echo "===> Testing with python$$i (python$$PYMAJOR)" ; \
-		rm -rf .testrepository ; \
-		testr-python$$PYMAJOR init ; \
-		TEMP_REZ=`mktemp -t` ; \
-		PYTHONPATH=$(CURDIR) PYTHON=python$$i testr-python$$PYMAJOR run --subunit 'glanceclient\.tests\.unit\.(?!(.*v2.test_client_requests.ClientTestRequests.test_show_bad_image_schema.*|.*test_ssl.TestHTTPSVerifyCert.test_v1_requests_cert_verification.*|.*test_ssl.TestHTTPSVerifyCert.test_v2_requests_cert_verification.*|.*test_get_schema.*))' | tee $$TEMP_REZ | subunit2pyunit ; \
- 		cat $$TEMP_REZ | subunit-filter -s --no-passthrough | subunit-stats ; \
-		rm -f $$TEMP_REZ ; \
-		testr-python$$PYMAJOR slowest ; \
-	done
+	pkgos-dh_auto_test 'glanceclient\.tests\.unit\.(?!(.*v2.test_client_requests.ClientTestRequests.test_show_bad_image_schema.*|.*test_ssl.TestHTTPSVerifyCert.test_v1_requests_cert_verification.*|.*test_ssl.TestHTTPSVerifyCert.test_v2_requests_cert_verification.*|.*test_get_schema.*))'
 endif
 
 override_dh_installman:

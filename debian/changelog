@@ -1,4 +1,4 @@
-python-glanceclient (1:2.1.0-1) UNRELEASED; urgency=medium
+python-glanceclient (1:2.1.0-1) experimental; urgency=medium
 
   [ Ondřej Nový ]
   * Standards-Version is 3.9.8 now (no change)
@@ -9,7 +9,10 @@ python-glanceclient (1:2.1.0-1) UNRELEASED; urgency=medium
   * d/gbp.conf: Update debian-branch for Newton.
   * d/control: Align (Build-)Depends with upstream.
 
- -- Corey Bryant <corey.bryant@canonical.com>  Thu, 07 Jul 2016 14:34:16 -0400
+  [ Thomas Goirand ]
+  * Using pkgos-dh_auto_{test,install} from openstack-pkg-tools >= 52~.
+
+ -- Thomas Goirand <zigo@debian.org>  Tue, 12 Jul 2016 18:34:35 +0000
 
 python-glanceclient (1:2.0.0-2) unstable; urgency=medium
 
