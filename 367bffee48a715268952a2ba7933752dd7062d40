@@ -1,0 +1,10 @@
+Code-Review+2: Erno Kuvaja <jokke@usr.fi>
+Code-Review+1: Stuart McLaren <stuart.mclaren@hp.com>
+Code-Review+2: Nikhil Komawar <nik.komawar@gmail.com>
+Workflow+1: Nikhil Komawar <nik.komawar@gmail.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Sat, 18 Apr 2015 00:25:41 +0000
+Reviewed-on: https://review.openstack.org/173979
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/stable/kilo

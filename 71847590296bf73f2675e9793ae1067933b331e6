@@ -1,0 +1,9 @@
+Code-Review+2: Erno Kuvaja <jokke@usr.fi>
+Code-Review+2: Thierry Carrez <thierry@openstack.org>
+Workflow+1: Thierry Carrez <thierry@openstack.org>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Thu, 16 Apr 2015 09:58:10 +0000
+Reviewed-on: https://review.openstack.org/173851
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/stable/kilo
