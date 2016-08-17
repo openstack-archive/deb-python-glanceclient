@@ -1,0 +1,9 @@
+Code-Review+2: Fei Long Wang <flwang@catalyst.net.nz>
+Code-Review+2: Louis Taylor <louis@kragniz.eu>
+Workflow+1: Louis Taylor <louis@kragniz.eu>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Sun, 17 Jul 2016 19:51:51 +0000
+Reviewed-on: https://review.openstack.org/341921
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/master

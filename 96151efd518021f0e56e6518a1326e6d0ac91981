@@ -1,0 +1,9 @@
+Code-Review+2: Erno Kuvaja <jokke@usr.fi>
+Workflow+1: Kairat Kushaev <kkushaev@mirantis.com>
+Code-Review+2: Kairat Kushaev <kkushaev@mirantis.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Fri, 15 Jul 2016 10:56:25 +0000
+Reviewed-on: https://review.openstack.org/331981
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/master

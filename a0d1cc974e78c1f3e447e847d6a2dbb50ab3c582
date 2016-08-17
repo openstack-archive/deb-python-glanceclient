@@ -1,0 +1,9 @@
+Code-Review+2: Kairat Kushaev <kkushaev@mirantis.com>
+Code-Review+2: Nikhil Komawar <nik.komawar@gmail.com>
+Workflow+1: Nikhil Komawar <nik.komawar@gmail.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Wed, 20 Jul 2016 19:22:02 +0000
+Reviewed-on: https://review.openstack.org/340048
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/master

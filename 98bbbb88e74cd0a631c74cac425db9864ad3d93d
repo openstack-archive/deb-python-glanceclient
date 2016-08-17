@@ -1,0 +1,9 @@
+Code-Review+2: Nikhil Komawar <nik.komawar@gmail.com>
+Workflow+1: Nikhil Komawar <nik.komawar@gmail.com>
+Code-Review+1: Hemanth Makkapati <hemanth.makkapati@rackspace.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Tue, 26 Jul 2016 15:36:46 +0000
+Reviewed-on: https://review.openstack.org/347288
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/master

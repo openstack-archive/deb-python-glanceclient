@@ -1,0 +1,10 @@
+Code-Review+2: Brian Rosmaita <brian.rosmaita@rackspace.com>
+Code-Review+1: Brianna Poulos <Brianna.Poulos@jhuapl.edu>
+Code-Review+2: Kairat Kushaev <kkushaev@mirantis.com>
+Workflow+1: Kairat Kushaev <kkushaev@mirantis.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Wed, 29 Jun 2016 16:04:35 +0000
+Reviewed-on: https://review.openstack.org/329787
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/master

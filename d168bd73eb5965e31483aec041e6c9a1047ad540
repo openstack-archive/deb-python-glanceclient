@@ -1,0 +1,9 @@
+Code-Review+2: Mike Fedosin <mfedosin@mirantis.com>
+Code-Review+2: Sabari <smurugesan@vmware.com>
+Workflow+1: Sabari <smurugesan@vmware.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Sun, 26 Jun 2016 05:00:29 +0000
+Reviewed-on: https://review.openstack.org/333446
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/master

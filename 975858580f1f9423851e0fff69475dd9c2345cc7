@@ -1,0 +1,10 @@
+Code-Review+2: Louis Taylor <louis@kragniz.eu>
+Code-Review+1: Hemanth Makkapati <hemanth.makkapati@rackspace.com>
+Code-Review+2: Kairat Kushaev <kkushaev@mirantis.com>
+Workflow+1: Kairat Kushaev <kkushaev@mirantis.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Wed, 20 Jul 2016 10:54:11 +0000
+Reviewed-on: https://review.openstack.org/341251
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/master
