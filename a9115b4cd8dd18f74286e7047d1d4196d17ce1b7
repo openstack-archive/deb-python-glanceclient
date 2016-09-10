@@ -1,0 +1,11 @@
+Code-Review+1: Clenimar Filemon <clenimar@lsd.ufcg.edu.br>
+Code-Review+1: liwei <wei.li@easystack.cn>
+Code-Review+2: Nikhil Komawar <nik.komawar@gmail.com>
+Code-Review+2: Fei Long Wang <flwang@catalyst.net.nz>
+Workflow+1: Nikhil Komawar <nik.komawar@gmail.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Sat, 10 Sep 2016 19:51:06 +0000
+Reviewed-on: https://review.openstack.org/290497
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/master
