@@ -1,0 +1,11 @@
+Code-Review+2: Alexander Tivelkov <ativelkov@mirantis.com>
+Code-Review+1: Kairat Kushaev <kkushaev@mirantis.com>
+Code-Review+1: Darja Shakhray <dshakhray@mirantis.com>
+Code-Review+2: Erno Kuvaja <jokke@usr.fi>
+Workflow+1: Erno Kuvaja <jokke@usr.fi>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Thu, 27 Aug 2015 17:29:04 +0000
+Reviewed-on: https://review.openstack.org/216705
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/feature/artifacts
