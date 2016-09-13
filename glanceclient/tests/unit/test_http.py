@@ -237,7 +237,15 @@ class TestClient(testtools.TestCase):
     def test_get_connections_kwargs_http(self):
         endpoint = 'http://example.com:9292'
         test_client = http.HTTPClient(endpoint, token=u'adc123')
-        self.assertEqual(test_client.timeout, 600.0)
+        self.assertEqual(600.0, test_client.timeout)
+
+    def test__chunk_body_exact_size_chunk(self):
+        test_client = http._BaseHTTPClient()
+        bytestring = b'x' * http.CHUNKSIZE
+        data = six.BytesIO(bytestring)
+        chunk = list(test_client._chunk_body(data))
+        self.assertEqual(1, len(chunk))
+        self.assertEqual([bytestring], chunk)
 
     def test_http_chunked_request(self):
         text = "Ok"

@@ -1,4 +1,4 @@
-# Copyright 2013 OpenStack LLC.
+# Copyright 2013 OpenStack Foundation
 # Copyright 2013 IBM Corp.
 # All Rights Reserved.
 #
@@ -35,7 +35,8 @@ class Controller(object):
     @utils.memoized_property
     def model(self):
         schema = self.schema_client.get('task')
-        return warlock.model_factory(schema.raw(), schemas.SchemaBasedModel)
+        return warlock.model_factory(schema.raw(),
+                                     base_class=schemas.SchemaBasedModel)
 
     def list(self, **kwargs):
         """Retrieve a listing of Task objects.

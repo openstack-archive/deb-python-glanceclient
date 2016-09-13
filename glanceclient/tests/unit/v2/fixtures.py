@@ -90,8 +90,8 @@ schema_fixture = {
     "properties": {
         "architecture": {
             "description": "Operating system architecture as specified in "
-                           "http://docs.openstack.org/trunk/openstack-compute"
-                           "/admin/content/adding-images.html",
+                           "http://docs.openstack.org/user-guide/common"
+                           "/cli_manage_images.html",
             "is_base": "false",
             "type": "string"
         },
@@ -318,4 +318,69 @@ schema_fixture = {
             "type": "string"
         }
     }
+}
+
+image_versions_fixture = {
+    "versions": [
+        {
+            "id": "v2.3",
+            "links": [
+                {
+                    "href": "http://localhost:9292/v2/",
+                    "rel": "self"
+                }
+            ],
+            "status": "CURRENT"
+        },
+        {
+            "id": "v2.2",
+            "links": [
+                {
+                    "href": "http://localhost:9292/v2/",
+                    "rel": "self"
+                }
+            ],
+            "status": "SUPPORTED"
+        },
+        {
+            "id": "v2.1",
+            "links": [
+                {
+                    "href": "http://localhost:9292/v2/",
+                    "rel": "self"
+                }
+            ],
+            "status": "SUPPORTED"
+        },
+        {
+            "id": "v2.0",
+            "links": [
+                {
+                    "href": "http://localhost:9292/v2/",
+                    "rel": "self"
+                }
+            ],
+            "status": "SUPPORTED"
+        },
+        {
+            "id": "v1.1",
+            "links": [
+                {
+                    "href": "http://localhost:9292/v1/",
+                    "rel": "self"
+                }
+            ],
+            "status": "SUPPORTED"
+        },
+        {
+            "id": "v1.0",
+            "links": [
+                {
+                    "href": "http://localhost:9292/v1/",
+                    "rel": "self"
+                }
+            ],
+            "status": "SUPPORTED"
+        }
+    ]
 }

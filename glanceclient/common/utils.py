@@ -246,21 +246,6 @@ def find_resource(manager, name_or_id):
         return matches[0]
 
 
-def skip_authentication(f):
-    """Function decorator used to indicate a caller may be unauthenticated."""
-    f.require_authentication = False
-    return f
-
-
-def is_authentication_required(f):
-    """Checks to see if the function requires authentication.
-
-    Use the skip_authentication decorator to indicate a caller may
-    skip the authentication step.
-    """
-    return getattr(f, 'require_authentication', True)
-
-
 def env(*vars, **kwargs):
     """Search for the first defined of possibly many env vars.
 
@@ -298,10 +283,10 @@ def save_image(data, path):
     :param path: path to save the image to
     """
     if path is None:
-        if six.PY3:
-            image = sys.stdout.buffer
-        else:
-            image = sys.stdout
+        # NOTE(kragniz): for py3 compatibility: sys.stdout.buffer is only
+        # present on py3, otherwise fall back to sys.stdout
+        image = getattr(sys.stdout, 'buffer',
+                        sys.stdout)
     else:
         image = open(path, 'wb')
     try:
@@ -375,9 +360,12 @@ def get_data_file(args):
             return None
         if not sys.stdin.isatty():
             # (2) image data is provided through standard input
+            image = sys.stdin
+            if hasattr(sys.stdin, 'buffer'):
+                image = sys.stdin.buffer
             if msvcrt:
-                msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
-            return sys.stdin
+                msvcrt.setmode(image.fileno(), os.O_BINARY)
+            return image
         else:
             # (3) no image data provided
             return None
