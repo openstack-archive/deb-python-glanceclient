@@ -55,8 +55,8 @@ Build-Depends-Indep: python-babel,
                      subunit,
                      testrepository,
 Standards-Version: 3.9.8
-Vcs-Browser: https://git.openstack.org/cgit/openstack/deb-python-glanceclient
-Vcs-Git: https://git.openstack.org/git/openstack/deb-python-glanceclient
+Vcs-Browser: https://git.openstack.org/cgit/openstack/deb-python-glanceclient?h=debian%2Fnewton
+Vcs-Git: https://git.openstack.org/git/openstack/deb-python-glanceclient -b debian/newton
 Homepage: http://glance.openstack.org
 XS-Testsuite: autopkgtest
 
