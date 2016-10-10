@@ -2,6 +2,8 @@
 
 include /usr/share/openstack-pkg-tools/pkgos.make
 
+export RES_OPTIONS=attempts:0
+
 %:
 	dh $@ --buildsystem=python_distutils --with python2,python3,sphinxdoc
 

@@ -1,3 +1,9 @@
+python-glanceclient (1:2.5.0-3) unstable; urgency=medium
+
+  * Defines RES_OPTIONS=attempts:0 to avoid network access (Closes: #835076).
+
+ -- Thomas Goirand <zigo@debian.org>  Mon, 10 Oct 2016 13:27:21 +0200
+
 python-glanceclient (1:2.5.0-2) unstable; urgency=medium
 
   [ Ondřej Nový ]
