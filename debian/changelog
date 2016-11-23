@@ -1,3 +1,9 @@
+python-glanceclient (1:2.5.0-4) UNRELEASED; urgency=medium
+
+  * Bumped debhelper compat version to 10
+
+ -- Ondřej Nový <onovy@debian.org>  Thu, 24 Nov 2016 00:06:17 +0100
+
 python-glanceclient (1:2.5.0-3) unstable; urgency=medium
 
   * Defines RES_OPTIONS=attempts:0 to avoid network access (Closes: #835076).
