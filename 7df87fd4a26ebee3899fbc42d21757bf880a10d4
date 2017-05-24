@@ -1,0 +1,12 @@
+Code-Review+2: Flavio Percoco <fpercoco@redhat.com>
+Code-Review+1: Abhishek Kekane <abhishek.kekane@nttdata.com>
+Code-Review+1: Matthew Edmonds <edmondsw@us.ibm.com>
+Code-Review+1: Sean Dague <sean@dague.net>
+Code-Review+2: Nikhil Komawar <nik.komawar@gmail.com>
+Workflow+1: Nikhil Komawar <nik.komawar@gmail.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Wed, 24 May 2017 17:03:32 +0000
+Reviewed-on: https://review.openstack.org/466385
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/master
