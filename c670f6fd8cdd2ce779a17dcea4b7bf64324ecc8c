@@ -1,0 +1,9 @@
+Code-Review+1: yuhui <yuhui@inspur.com>
+Code-Review+2: Erno Kuvaja <jokke@usr.fi>
+Workflow+1: Erno Kuvaja <jokke@usr.fi>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Fri, 02 Jun 2017 10:45:33 +0000
+Reviewed-on: https://review.openstack.org/464859
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/stable/ocata
