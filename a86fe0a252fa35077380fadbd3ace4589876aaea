@@ -1,0 +1,9 @@
+Code-Review+2: Erno Kuvaja <jokke@usr.fi>
+Workflow+1: Erno Kuvaja <jokke@usr.fi>
+Code-Review+1: Sean McGinnis <sean.mcginnis@gmail.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Wed, 14 Jun 2017 18:18:01 +0000
+Reviewed-on: https://review.openstack.org/472911
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/master
