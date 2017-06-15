@@ -1,0 +1,11 @@
+Code-Review+2: Brian Rosmaita <rosmaita.fossdev@gmail.com>
+Code-Review+1: Sean Dague <sean@dague.net>
+Code-Review+1: Sean McGinnis <sean.mcginnis@gmail.com>
+Code-Review+2: Mike Fedosin <mikhail.fedosin.ext@nokia.com>
+Workflow+1: Mike Fedosin <mikhail.fedosin.ext@nokia.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Thu, 15 Jun 2017 21:13:17 +0000
+Reviewed-on: https://review.openstack.org/457974
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/master
