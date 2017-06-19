@@ -1,0 +1,9 @@
+Code-Review+2: Erno Kuvaja <jokke@usr.fi>
+Code-Review+2: Brian Rosmaita <rosmaita.fossdev@gmail.com>
+Workflow+1: Brian Rosmaita <rosmaita.fossdev@gmail.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Mon, 19 Jun 2017 15:40:17 +0000
+Reviewed-on: https://review.openstack.org/457975
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/master
