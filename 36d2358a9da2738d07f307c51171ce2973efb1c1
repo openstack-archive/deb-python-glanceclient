@@ -1,0 +1,12 @@
+Code-Review+1: Maciej Kucia <maciej@kucia.net>
+Code-Review+1: Sean McGinnis <sean.mcginnis@gmail.com>
+Code-Review+1: junbo.li <junbo85.li@gmail.com>
+Code-Review+2: Mike Fedosin <mikhail.fedosin.ext@nokia.com>
+Code-Review+2: Erno Kuvaja <jokke@usr.fi>
+Workflow+1: Erno Kuvaja <jokke@usr.fi>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Mon, 19 Jun 2017 19:13:08 +0000
+Reviewed-on: https://review.openstack.org/447808
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/master
