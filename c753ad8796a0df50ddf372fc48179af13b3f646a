@@ -1,0 +1,10 @@
+Code-Review+1: Sean McGinnis <sean.mcginnis@gmail.com>
+Code-Review+2: Abhishek Kekane <abhishek.kekane@nttdata.com>
+Code-Review+2: Brian Rosmaita <rosmaita.fossdev@gmail.com>
+Workflow+1: Brian Rosmaita <rosmaita.fossdev@gmail.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Tue, 25 Jul 2017 03:08:43 +0000
+Reviewed-on: https://review.openstack.org/485030
+Project: openstack/deb-python-glanceclient
+Branch: refs/heads/master
